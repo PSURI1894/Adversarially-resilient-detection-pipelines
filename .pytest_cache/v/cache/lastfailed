@@ -1,0 +1,4 @@
+{
+  "tests/test_data_engine.py::TestDataInfrastructure::test_cleaning_pipeline": true,
+  "tests/test_models.py::TestModelLogic::test_adversarial_training_step": true
+}

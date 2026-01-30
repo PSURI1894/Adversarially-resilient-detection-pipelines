@@ -1,0 +1,11 @@
+[
+  "tests/test_conformal.py::TestConformalMath::test_prediction_set_logic",
+  "tests/test_conformal.py::TestConformalMath::test_split_conformal_coverage",
+  "tests/test_conformal.py::TestRiskController::test_fsm_state_transitions",
+  "tests/test_data_engine.py::TestAdversaryArsenal::test_evasion_bounds",
+  "tests/test_data_engine.py::TestDataInfrastructure::test_cleaning_pipeline",
+  "tests/test_data_engine.py::TestDataInfrastructure::test_feature_factory_entropy",
+  "tests/test_models.py::TestModelLogic::test_adversarial_training_step",
+  "tests/test_models.py::TestModelLogic::test_cnn_architecture_shapes",
+  "tests/test_models.py::TestModelLogic::test_ensemble_probability_sum"
+]

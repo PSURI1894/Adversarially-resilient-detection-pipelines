@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Data (never push raw/processed datasets)
+data/raw/
+data/processed/
+
+# Logs & generated reports
+*.log
+reports/
+Y

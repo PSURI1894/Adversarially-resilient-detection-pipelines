@@ -1,0 +1,14 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Data (DO NOT PUSH RAW DATA)
+data/raw/
+data/processed/
+
+# Reports generated files
+reports/audit_logs/
+reports/figures/
