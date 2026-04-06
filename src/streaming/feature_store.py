@@ -11,6 +11,10 @@ Includes:
     - Feature versioning with schema tracking
     - Point-in-time correctness for backfilling
     - Training–serving skew detection
+<<<<<<< HEAD
+=======
+    - SHA-256 checksums for integrity
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 ================================================================================
 """
 
@@ -44,7 +48,11 @@ class FeatureStore:
                  schema_version: str = "v1.0"):
         self.schema_version = schema_version
         self.max_memory_items = max_memory_items
+<<<<<<< HEAD
         self._cache = OrderedDict()
+=======
+        self._cache: OrderedDict = OrderedDict()
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         self._redis = None
         self._schema_registry: Dict[str, Dict] = {}
 
@@ -58,7 +66,10 @@ class FeatureStore:
                 logger.warning(f"Redis unavailable ({e}), using in-memory only")
                 self._redis = None
 
+<<<<<<< HEAD
         # Register initial schema
+=======
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         self.register_schema(schema_version, {"type": "default"})
 
     # ------------------------------------------------------------------
@@ -90,12 +101,18 @@ class FeatureStore:
 
     def get(self, key: str) -> Optional[np.ndarray]:
         """Retrieve a feature vector."""
+<<<<<<< HEAD
         # Check memory first
+=======
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         if key in self._cache:
             self._cache.move_to_end(key)
             return np.array(self._cache[key]["features"], dtype=np.float32)
 
+<<<<<<< HEAD
         # Fall back to Redis
+=======
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         if self._redis:
             try:
                 data = self._redis.get(f"fs:{key}")
@@ -144,15 +161,35 @@ class FeatureStore:
         for i, key in enumerate(keys):
             self.put(key, features_batch[i])
 
+<<<<<<< HEAD
     def get_batch(self, keys: List[str]) -> np.ndarray:
         """Retrieve a batch, returns NaN for missing keys."""
+=======
+    def get_batch(self, keys: List[str], expected_dim: Optional[int] = None) -> List[Optional[np.ndarray]]:
+        """
+        Retrieve a batch. Returns list of arrays (None for missing keys).
+
+        Parameters
+        ----------
+        keys : list of str
+        expected_dim : int, optional
+            If provided, missing entries return np.full(expected_dim, np.nan).
+        """
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         results = []
         for key in keys:
             feats = self.get(key)
             if feats is not None:
                 results.append(feats)
+<<<<<<< HEAD
             else:
                 results.append(np.full(1, np.nan))
+=======
+            elif expected_dim is not None:
+                results.append(np.full(expected_dim, np.nan, dtype=np.float32))
+            else:
+                results.append(None)
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         return results
 
     # ------------------------------------------------------------------
@@ -164,7 +201,13 @@ class FeatureStore:
         self._schema_registry[version] = {
             "schema": schema,
             "registered_at": time.time(),
+<<<<<<< HEAD
             "checksum": hashlib.md5(json.dumps(schema).encode()).hexdigest(),
+=======
+            "checksum": hashlib.sha256(
+                json.dumps(schema, sort_keys=True).encode()
+            ).hexdigest(),
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         }
 
     def get_schema(self, version: Optional[str] = None) -> Optional[Dict]:
@@ -179,10 +222,18 @@ class FeatureStore:
                    serving_features: np.ndarray,
                    threshold: float = 0.1) -> Dict[str, Any]:
         """
+<<<<<<< HEAD
         Detect training-serving feature skew.
 
         Compares per-feature mean/std between training and serving
         distributions. Returns features that exceed the threshold.
+=======
+        Detect training-serving feature skew via Z-score comparison.
+
+        Compares per-feature mean between training and serving
+        distributions, normalised by training std. Features whose
+        Z-score exceeds `threshold` are flagged.
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         """
         train_mean = np.mean(training_features, axis=0)
         train_std = np.std(training_features, axis=0) + 1e-8

@@ -1,0 +1,67 @@
+# ==============================================================================
+# PRODUCTION CONFIGURATION
+# ==============================================================================
+# Overrides for production deployment. Inherits from default.yaml.
+# ==============================================================================
+
+# ── Data ─────────────────────────────────────────────────────
+data:
+  raw_path: data/raw/02-14-2018.csv
+  processed_path: data/processed/processed_flows.csv
+  chunk_size: 200000
+  random_state: 42
+  test_size: 0.20
+  calibration_split: 0.25
+
+# ── Streaming (Production endpoints) ────────────────────────
+streaming:
+  kafka:
+    bootstrap_servers: kafka:9092
+    raw_topic: raw-traffic
+    enriched_topic: enriched-features
+    results_topic: prediction-results
+  feature_store:
+    redis_url: redis://redis:6379
+    max_memory_items: 100000
+    schema_version: v1.0
+  inference:
+    latency_target_ms: 50.0
+    batch_size: 512
+
+# ── Conformal ────────────────────────────────────────────────
+conformal:
+  alpha: 0.05
+  backend: rscp_plus
+  rscp:
+    sigma: 0.1
+    n_samples: 1000
+    ptt: true
+
+# ── Risk Thermostat (Tighter thresholds for prod) ───────────
+risk:
+  analyst_capacity: 100
+  warning_threshold: 1.1
+  critical_threshold: 1.5
+  hysteresis_steps: 5
+  cooldown_seconds: 60.0
+
+# ── Drift ────────────────────────────────────────────────────
+drift:
+  consensus_threshold: 2
+  retraining:
+    validation_gate: 0.02
+    active_learning_strategy: uncertainty
+    uncertainty_percentile: 80.0
+
+# ── MLOps (Production services) ─────────────────────────────
+mlops:
+  experiment:
+    name: ids-pipeline-prod
+    tracking_uri: http://mlflow:5000
+  registry:
+    name: ids-ensemble-prod
+    promotion_threshold: 0.02
+    promotion_metric: robust_f1
+  monitoring:
+    prometheus_port: 9090
+    enable_server: true

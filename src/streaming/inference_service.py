@@ -4,6 +4,14 @@ REAL-TIME INFERENCE SERVICE
 ================================================================================
 Consumes enriched features, runs ensemble prediction + conformal sets,
 publishes results. Tracks latency and exposes health check.
+<<<<<<< HEAD
+=======
+
+Optimisations over v1:
+    - Vectorised batch prediction (single predict_proba call per batch)
+    - Separated latency tracking from inference hot-path
+    - Configurable health degradation thresholds
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 ================================================================================
 """
 
@@ -30,14 +38,27 @@ class RealtimeInferenceService:
         Expected feature dimensionality (raw only, before window agg).
     latency_target_ms : float
         P99 latency target in milliseconds.
+<<<<<<< HEAD
     """
 
     def __init__(self, model, conformal_engine=None, input_dim: int = 10,
                  latency_target_ms: float = 50.0):
+=======
+    degraded_multiplier : float
+        Multiplier on latency_target_ms that triggers degraded status.
+    """
+
+    def __init__(self, model, conformal_engine=None, input_dim: int = 10,
+                 latency_target_ms: float = 50.0, degraded_multiplier: float = 2.0):
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         self.model = model
         self.conformal_engine = conformal_engine
         self.input_dim = input_dim
         self.latency_target_ms = latency_target_ms
+<<<<<<< HEAD
+=======
+        self.degraded_multiplier = degraded_multiplier
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 
         self._latency_buffer = deque(maxlen=10_000)
         self.stats = {
@@ -48,19 +69,30 @@ class RealtimeInferenceService:
         }
         self._healthy = True
 
+<<<<<<< HEAD
     def predict(self, features: np.ndarray) -> Dict[str, Any]:
+=======
+    def predict(self, features) -> Dict[str, Any]:
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         """
         Run inference on a single enriched feature vector.
 
         Parameters
         ----------
+<<<<<<< HEAD
         features : np.ndarray
             Enriched feature vector (may be longer than input_dim due to agg).
+=======
+        features : np.ndarray or dict
+            Enriched feature vector (may be longer than input_dim due to agg).
+            If dict, extracts 'features' key.
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 
         Returns
         -------
         dict with prediction, probabilities, conformal set, latency.
         """
+<<<<<<< HEAD
         t0 = time.perf_counter()
 
         # Truncate to raw feature dim for model (window aggs are metadata)
@@ -69,6 +101,17 @@ class RealtimeInferenceService:
         pred_label = int(np.argmax(probs))
 
         # Conformal prediction set
+=======
+        if isinstance(features, dict):
+            features = np.array(features["features"], dtype=np.float32)
+
+        t0 = time.perf_counter()
+
+        x = np.asarray(features[:self.input_dim], dtype=np.float32).reshape(1, -1)
+        probs = self.model.predict_proba(x)[0]
+        pred_label = int(np.argmax(probs))
+
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         pred_set = [pred_label]
         if self.conformal_engine:
             try:
@@ -79,7 +122,10 @@ class RealtimeInferenceService:
         latency_ms = (time.perf_counter() - t0) * 1000
         self._latency_buffer.append(latency_ms)
 
+<<<<<<< HEAD
         # Stats
+=======
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         self.stats["inferences"] += 1
         if pred_label == 1:
             self.stats["alerts"] += 1
@@ -97,6 +143,7 @@ class RealtimeInferenceService:
         }
 
     def predict_batch(self, batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+<<<<<<< HEAD
         """Run inference on a batch of enriched records."""
         results = []
         for record in batch:
@@ -105,6 +152,64 @@ class RealtimeInferenceService:
             result["label_true"] = record.get("label", -1)
             result["timestamp"] = record.get("timestamp", time.time())
             results.append(result)
+=======
+        """
+        Run vectorised inference on a batch of enriched records.
+
+        Extracts features into a single array, runs one predict_proba call,
+        then builds per-record results.
+        """
+        if not batch:
+            return []
+
+        t0 = time.perf_counter()
+
+        # Vectorised feature extraction
+        raw_matrix = np.array(
+            [np.array(r["features"], dtype=np.float32)[:self.input_dim] for r in batch],
+            dtype=np.float32,
+        )
+
+        probs_matrix = self.model.predict_proba(raw_matrix)
+        pred_labels = np.argmax(probs_matrix, axis=1)
+
+        # Conformal sets (batch)
+        if self.conformal_engine:
+            try:
+                all_sets = self.conformal_engine.prediction_sets(raw_matrix, self.model)
+            except Exception:
+                all_sets = [[int(p)] for p in pred_labels]
+        else:
+            all_sets = [[int(p)] for p in pred_labels]
+
+        latency_ms = (time.perf_counter() - t0) * 1000
+        per_record_latency = latency_ms / len(batch)
+
+        results = []
+        for i, record in enumerate(batch):
+            pred_set = all_sets[i]
+            pred_label = int(pred_labels[i])
+
+            self._latency_buffer.append(per_record_latency)
+            self.stats["inferences"] += 1
+            if pred_label == 1:
+                self.stats["alerts"] += 1
+            if len(pred_set) > 1:
+                self.stats["uncertain"] += 1
+            if per_record_latency > self.latency_target_ms:
+                self.stats["latency_violations"] += 1
+
+            results.append({
+                "prediction": pred_label,
+                "probabilities": probs_matrix[i].tolist(),
+                "prediction_set": pred_set,
+                "uncertainty": "HIGH" if len(pred_set) > 1 else "LOW",
+                "latency_ms": round(per_record_latency, 3),
+                "label_true": record.get("label", -1),
+                "timestamp": record.get("timestamp", time.time()),
+            })
+
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         return results
 
     # ------------------------------------------------------------------
@@ -117,7 +222,11 @@ class RealtimeInferenceService:
         p99 = float(np.percentile(latencies, 99)) if latencies else 0.0
         p50 = float(np.percentile(latencies, 50)) if latencies else 0.0
 
+<<<<<<< HEAD
         self._healthy = p99 < self.latency_target_ms * 2  # 2× target = degraded
+=======
+        self._healthy = p99 < self.latency_target_ms * self.degraded_multiplier
+>>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 
         return {
             "status": "healthy" if self._healthy else "degraded",

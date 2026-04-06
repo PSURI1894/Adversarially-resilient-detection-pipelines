@@ -10,6 +10,7 @@ Includes:
     - Avro-style schema validation (dict-based, no external dependency)
     - Configurable throughput throttling
     - Back-pressure handling via producer buffering
+    - Chunked CSV ingestion for memory efficiency
 ================================================================================
 """
 
@@ -35,11 +36,14 @@ FLOW_SCHEMA = {
                "protocol", "features", "label"],
 }
 
+_REQUIRED_FIELDS = frozenset({"features"})
+
 
 def validate_flow(record: Dict[str, Any]) -> bool:
     """Basic schema validation for flow records."""
-    required = {"features"}
-    return required.issubset(record.keys())
+    if not isinstance(record, dict):
+        return False
+    return _REQUIRED_FIELDS.issubset(record.keys())
 
 
 # ── IN-MEMORY BUS (Kafka fallback) ────────────────────────────
@@ -109,11 +113,11 @@ class FlowProducer:
         if not self._use_kafka:
             self._bus = _InMemoryBus.get_topic(self.topic)
 
-    def send(self, record: Dict[str, Any]):
-        """Send a single flow record."""
+    def send(self, record: Dict[str, Any]) -> bool:
+        """Send a single flow record. Returns True on success."""
         if not validate_flow(record):
             self.stats["errors"] += 1
-            return
+            return False
 
         if self._use_kafka:
             self._kafka_producer.send(self.topic, value=record)
@@ -122,10 +126,12 @@ class FlowProducer:
                 self._bus.put_nowait(record)
             except queue.Full:
                 self.stats["errors"] += 1
-                return
+                return False
 
+        payload_size = len(json.dumps(record))
         self.stats["sent"] += 1
-        self.stats["bytes"] += len(json.dumps(record))
+        self.stats["bytes"] += payload_size
+        return True
 
     def send_batch(self, records: List[Dict[str, Any]]):
         """Send a batch of records with optional throttling."""
@@ -136,9 +142,13 @@ class FlowProducer:
                 time.sleep(delay)
 
     def publish_csv(self, csv_path: str, feature_columns: Optional[List[str]] = None,
-                    label_column: str = "label", max_rows: Optional[int] = None):
+                    label_column: str = "label", max_rows: Optional[int] = None,
+                    chunk_size: int = 10_000):
         """
         Read a CSV file and publish each row as a flow record.
+
+        Uses chunked reading + vectorised extraction for memory efficiency
+        and speed (avoids iterrows).
 
         Parameters
         ----------
@@ -150,21 +160,28 @@ class FlowProducer:
             Label column name.
         max_rows : int, optional
             Max rows to publish (for testing).
+        chunk_size : int
+            Rows per chunk for streaming reads.
         """
-        df = pd.read_csv(csv_path)
-        if max_rows:
-            df = df.head(max_rows)
+        rows_sent = 0
+        for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
+            if feature_columns is None:
+                feature_columns = [c for c in chunk.columns if c != label_column]
 
-        if feature_columns is None:
-            feature_columns = [c for c in df.columns if c != label_column]
+            feats = chunk[feature_columns].values
+            labels = chunk[label_column].values if label_column in chunk.columns else np.full(len(chunk), -1)
+            now = time.time()
 
-        for _, row in df.iterrows():
-            record = {
-                "features": row[feature_columns].values.tolist(),
-                "label": int(row[label_column]) if label_column in row else -1,
-                "timestamp": time.time(),
-            }
-            self.send(record)
+            for i in range(len(chunk)):
+                if max_rows and rows_sent >= max_rows:
+                    return
+                record = {
+                    "features": feats[i].tolist(),
+                    "label": int(labels[i]),
+                    "timestamp": now,
+                }
+                self.send(record)
+                rows_sent += 1
 
     def flush(self):
         if self._use_kafka and self._kafka_producer:
