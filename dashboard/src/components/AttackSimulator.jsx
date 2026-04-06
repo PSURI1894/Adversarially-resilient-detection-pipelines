@@ -1,0 +1,123 @@
+/* ==============================================================================
+   ATTACK SIMULATOR — INTERACTIVE ADVERSARIAL ATTACK CONTROLS
+   ============================================================================== */
+
+import React, { useState } from 'react';
+import { colors } from '../utils/theme';
+import { api } from '../services/api';
+
+const ATTACK_TYPES = [
+  { value: 'pgd', label: 'PGD (White-box)' },
+  { value: 'carlini_wagner', label: 'C&W L2' },
+  { value: 'auto_attack', label: 'AutoAttack' },
+  { value: 'boundary', label: 'Boundary (Black-box)' },
+  { value: 'feature_constrained', label: 'Feature Constrained' },
+  { value: 'slow_drip', label: 'Slow Drip' },
+  { value: 'label_flip', label: 'Label Flip Poison' },
+  { value: 'calibration', label: 'Calibration Poison' },
+];
+
+export default function AttackSimulator() {
+  const [attackType, setAttackType] = useState('pgd');
+  const [epsilon, setEpsilon] = useState(0.1);
+  const [nSamples, setNSamples] = useState(1000);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleSimulate = async () => {
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await api.simulate({ attack_type: attackType, epsilon, n_samples: nSamples });
+      setResult(res);
+    } catch (err) {
+      setResult({ status: 'error', message: err.message });
+    }
+    setRunning(false);
+  };
+
+  return (
+    <div className="glass-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="glass-panel-header">
+        <span>Attack Simulator</span>
+        {running && <span className="badge badge-warning pulse">RUNNING</span>}
+      </div>
+      <div className="glass-panel-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Attack type */}
+        <div>
+          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            ATTACK TYPE
+          </label>
+          <select value={attackType} onChange={(e) => setAttackType(e.target.value)}
+            style={{ width: '100%' }}>
+            {ATTACK_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Epsilon */}
+        <div>
+          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            EPSILON: <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>{epsilon.toFixed(2)}</span>
+          </label>
+          <input
+            type="range"
+            className="input-range"
+            min="0" max="0.5" step="0.01"
+            value={epsilon}
+            onChange={(e) => setEpsilon(parseFloat(e.target.value))}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+            <span>0.00</span><span>0.25</span><span>0.50</span>
+          </div>
+        </div>
+
+        {/* Samples */}
+        <div>
+          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            SAMPLES
+          </label>
+          <input
+            type="number"
+            value={nSamples}
+            onChange={(e) => setNSamples(parseInt(e.target.value) || 100)}
+            min={100} max={50000} step={100}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        {/* Launch button */}
+        <button className="btn btn-danger" onClick={handleSimulate} disabled={running}
+          style={{
+            width: '100%', justifyContent: 'center', padding: '10px 0',
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+            opacity: running ? 0.5 : 1,
+          }}>
+          {running ? 'SIMULATING...' : 'LAUNCH ATTACK'}
+        </button>
+
+        {/* Result */}
+        {result && (
+          <div style={{
+            padding: 10, borderRadius: 8, fontSize: 10,
+            fontFamily: 'var(--font-mono)',
+            background: result.status === 'error' ? 'var(--red-dim)' : 'var(--cyan-dim)',
+            border: `1px solid ${result.status === 'error' ? colors.red : colors.cyan}33`,
+          }}>
+            {result.status === 'error' ? (
+              <span style={{ color: colors.red }}>Error: {result.message}</span>
+            ) : (
+              <>
+                <div style={{ color: colors.cyan }}>Simulation #{result.sim_id} started</div>
+                <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+                  {result.attack_type} | eps={result.epsilon} | n={result.n_samples}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
