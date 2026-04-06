@@ -1,0 +1,60 @@
+# ==============================================================================
+# EXPERIMENT CONFIGURATION
+# ==============================================================================
+# Settings for experiment tracking, benchmarks, and ablation studies.
+# ==============================================================================
+
+# ── Experiment Tracking ──────────────────────────────────────
+tracking:
+  experiment_name: ids-research
+  tracking_uri: null  # null = local mlruns
+  auto_log:
+    - training/loss
+    - training/f1
+    - evaluation/f1
+    - evaluation/fdr
+    - evaluation/auc
+    - evaluation/ece
+    - conformal/coverage
+    - conformal/avg_set_size
+    - attack/robust_accuracy
+    - drift/recovery_time
+
+# ── Benchmark Suite ──────────────────────────────────────────
+benchmarks:
+  robustness_curves:
+    attacks: [pgd, carlini_wagner, auto_attack]
+    epsilons: [0.0, 0.01, 0.025, 0.05, 0.075, 0.10, 0.15, 0.20, 0.25, 0.30]
+    n_repeats: 3  # For confidence intervals
+  poisoning:
+    fractions: [0.0, 0.01, 0.03, 0.05, 0.10, 0.15, 0.20]
+  coverage:
+    alphas: [0.01, 0.05, 0.10, 0.20]
+
+# ── Ablation Studies ─────────────────────────────────────────
+ablation:
+  ensemble_composition:
+    configs:
+      - [xgboost]
+      - [xgboost, cnn]
+      - [xgboost, cnn, transformer]
+      - [xgboost, cnn, transformer, vae]
+      - [xgboost, cnn, transformer, vae, deep_ensemble]
+  adversarial_training:
+    methods: [none, pgd, trades, free]
+  conformal_backend:
+    backends: [split, rscp, rscp_plus, online, adaptive]
+  xai_detection:
+    methods: [none, shap_fingerprint, lime_fingerprint]
+  drift_handling:
+    configs: [no_retraining, static_window, adaptive_retraining]
+
+# ── Reporting ────────────────────────────────────────────────
+reporting:
+  output_dir: experiments/results
+  figure_format: pdf  # pdf for publication, png for dashboards
+  figure_dpi: 300
+  table_format: latex
+  statistical_tests:
+    significance_level: 0.05
+    methods: [paired_t_test, wilcoxon]

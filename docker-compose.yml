@@ -1,0 +1,136 @@
+# ==============================================================================
+# DOCKER COMPOSE — FULL PIPELINE STACK
+# ==============================================================================
+# Services:
+#   - pipeline: Main IDS pipeline application
+#   - kafka + zookeeper: Event streaming
+#   - redis: Feature store backend
+#   - mlflow: Experiment tracking server
+#   - prometheus: Metrics collection
+#   - grafana: Dashboard visualization
+# ==============================================================================
+
+version: "3.9"
+
+services:
+  # ── Application ────────────────────────────────────────────
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ids-pipeline
+    ports:
+      - "8000:8000"   # FastAPI
+      - "9090:9090"   # Prometheus metrics
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./models:/app/models
+      - ./configs:/app/configs
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ids-network
+
+  # ── Kafka (Event Streaming) ────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ids-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ids-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ids-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - ids-network
+
+  # ── Redis (Feature Store) ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ids-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ids-network
+
+  # ── MLflow (Experiment Tracking) ───────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.2
+    container_name: ids-mlflow
+    ports:
+      - "5000:5000"
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlruns
+    volumes:
+      - mlflow-data:/mlruns
+    networks:
+      - ids-network
+
+  # ── Prometheus (Metrics Collection) ────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: ids-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - pipeline
+    networks:
+      - ids-network
+
+  # ── Grafana (Dashboard) ────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: ids-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - ids-network
+
+volumes:
+  mlflow-data:
+  grafana-data:
+
+networks:
+  ids-network:
+    driver: bridge

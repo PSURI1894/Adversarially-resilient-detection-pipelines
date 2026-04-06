@@ -1,0 +1,94 @@
+# ==============================================================================
+# DEFAULT CONFIGURATION — ADVERSARIALLY RESILIENT IDS PIPELINE
+# ==============================================================================
+# Base configuration loaded by Hydra. Override with environment-specific files.
+# ==============================================================================
+
+# ── Data ─────────────────────────────────────────────────────
+data:
+  raw_path: data/raw/02-14-2018.csv
+  processed_path: data/processed/processed_flows.csv
+  chunk_size: 200000
+  random_state: 42
+  test_size: 0.20
+  calibration_split: 0.25
+
+# ── Ensemble ─────────────────────────────────────────────────
+ensemble:
+  models:
+    xgboost:
+      n_estimators: 150
+      max_depth: 5
+      learning_rate: 0.1
+      eval_metric: logloss
+    cnn:
+      epochs: 8
+      adversarial_eps: 0.05
+    transformer:
+      epochs: 3
+      batch_size: 256
+    vae:
+      latent_dim: 16
+      epochs: 3
+    deep_ensemble:
+      n_members: 5
+      epochs: 10
+
+# ── Conformal Prediction ─────────────────────────────────────
+conformal:
+  alpha: 0.05
+  backend: split  # split | rscp | rscp_plus | online | adaptive
+  rscp:
+    sigma: 0.1
+    n_samples: 1000
+    ptt: true
+
+# ── Risk Thermostat ──────────────────────────────────────────
+risk:
+  analyst_capacity: 50
+  warning_threshold: 1.1
+  critical_threshold: 1.8
+  hysteresis_steps: 3
+  cooldown_seconds: 0.0
+
+# ── Streaming ────────────────────────────────────────────────
+streaming:
+  kafka:
+    bootstrap_servers: null  # null = in-memory fallback
+    raw_topic: raw-traffic
+    enriched_topic: enriched-features
+    results_topic: prediction-results
+  feature_store:
+    redis_url: null  # null = in-memory fallback
+    max_memory_items: 50000
+    schema_version: v1.0
+  inference:
+    latency_target_ms: 50.0
+    batch_size: 256
+
+# ── Drift Detection ──────────────────────────────────────────
+drift:
+  consensus_threshold: 2
+  adwin:
+    delta: 0.002
+    window_size: 1000
+  page_hinkley:
+    delta: 0.005
+    lambda_threshold: 50
+  retraining:
+    validation_gate: 0.02
+    active_learning_strategy: uncertainty
+    uncertainty_percentile: 70.0
+
+# ── MLOps ────────────────────────────────────────────────────
+mlops:
+  experiment:
+    name: ids-pipeline
+    tracking_uri: null  # null = local ./mlruns
+  registry:
+    name: ids-ensemble
+    promotion_threshold: 0.02
+    promotion_metric: robust_f1
+  monitoring:
+    prometheus_port: 9090
+    enable_server: false
