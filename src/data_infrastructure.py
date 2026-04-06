@@ -13,6 +13,7 @@ import traceback
 from typing import Tuple, List
 import numpy as np
 import pandas as pd
+from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
 from pathlib import Path
@@ -196,14 +197,22 @@ class DataOrchestrator:
             raise DataOrchestrationError(str(e))
 
 
+@dataclass
+class AttackStrategy:
+    attack_type: str
+    params: dict
+
 class AdversarialArsenal:
-    """Physically plausible adversarial transformations."""
+    """Thin facade over src.attacks with streaming generator pattern."""
 
     def __init__(self, feature_names: List[str]):
+        from src.attacks import ATTACK_REGISTRY
+        self.feature_names = feature_names
+        self.registry = ATTACK_REGISTRY
         self.indices = [
             i
             for i, f in enumerate(feature_names)
-            if any(k in f for k in ["iat", "duration", "pkts"])
+            if any(k in f for k in ["iat", "duration", "pkts", "bytes"])
         ]
 
     # === TEST-COMPATIBLE API ===
@@ -212,20 +221,43 @@ class AdversarialArsenal:
         noise = np.random.uniform(-epsilon, epsilon, size=X.shape)
         return X_adv + noise
 
-    # === PHYSICALLY TARGETED ATTACK ===
-    def evasion_jitter(self, X: np.ndarray, epsilon: float = 0.05) -> np.ndarray:
-        X_adv = X.copy()
-        scale = np.std(X[:, self.indices], axis=0) + 1e-6
-        noise = np.random.normal(
-            0, epsilon * scale, size=(X.shape[0], len(self.indices))
-        )
-        X_adv[:, self.indices] += noise
-        return X_adv
+    # === NEW FACADE API ===
+    def generate_streaming(self, model, X: np.ndarray, y: np.ndarray, strategy: AttackStrategy, batch_size: int = 10_000) -> Tuple[np.ndarray, np.ndarray]:
+        """Streaming attack application via generator pattern for memory efficiency."""
+        if strategy.attack_type not in self.registry:
+            raise ValueError(f"Unknown attack: {strategy.attack_type}")
+            
+        attack_class = self.registry[strategy.attack_type]
+        
+        # Determine config based on attack
+        # Many attacks use AttackConfig (white-box) or just take param kwargs (poisoning/GAN)
+        try:
+            from src.attacks.white_box import AttackConfig
+            cfg = AttackConfig(mutable_features=self.indices, **strategy.params)
+            attack = attack_class(cfg)
+        except Exception:
+            attack = attack_class(**strategy.params)
 
-    def slow_and_low(self, X: np.ndarray, factor: float = 1.3) -> np.ndarray:
-        X_adv = X.copy()
-        X_adv[:, self.indices] *= factor
-        return X_adv
+        for i in range(0, len(X), batch_size):
+            batch_X = X[i:i + batch_size]
+            batch_y = y[i:i + batch_size]
+            
+            try:
+                batch_adv = attack.generate(model, batch_X, batch_y)
+            except TypeError:
+                try:
+                    batch_adv = attack.generate(batch_X, batch_y)
+                except TypeError:
+                    batch_adv = attack.generate(batch_X)
+                    
+            yield batch_adv, batch_y
+
+    def apply_attack(self, model, X: np.ndarray, y: np.ndarray, strategy: AttackStrategy) -> np.ndarray:
+        """Apply attack over whole dataset using the streaming generator."""
+        chunks = []
+        for batch_adv, _ in self.generate_streaming(model, X, y, strategy):
+            chunks.append(batch_adv)
+        return np.vstack(chunks)
 
 
 if __name__ == "__main__":
