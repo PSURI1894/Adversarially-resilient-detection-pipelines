@@ -1,0 +1,101 @@
+# ==============================================================================
+# docker-compose.prod.yml — t2.micro Optimised Production Stack
+# ==============================================================================
+# Stripped to fit within 1 GB RAM constraint of AWS Free Tier t2.micro.
+# Removes: Kafka, Zookeeper, Grafana, Prometheus.
+# Replaces: full Redis → lightweight Redis (128 MB cap).
+# Adds:     nginx reverse proxy for TLS termination + WebSocket.
+#
+# Usage (on EC2):
+#   docker compose -f docker-compose.prod.yml up -d
+# ==============================================================================
+
+version: "3.9"
+
+services:
+
+  # ── ARDP API + Pipeline ────────────────────────────────────
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: ardp-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ARDP_MODE: "demo"                        # no Kafka → in-memory flow gen
+      REDIS_URL: "redis://redis:6379"
+      MLFLOW_TRACKING_URI: "sqlite:///mlruns/mlflow.db"
+      CONFORMAL_ALPHA: "0.05"
+      RSCP_SIGMA: "0.1"
+      DRIFT_CONSENSUS: "2"
+      PYTHONPATH: "/app"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../../data:/app/data:ro               # read-only; training data
+      - ../../models:/app/models              # model checkpoints
+      - mlruns:/app/mlruns                   # MLflow tracking
+      - reports:/app/reports
+    mem_limit: 700m                           # leave 300 MB for OS + Redis + nginx
+    cpus: "0.9"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/status')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ardp-net
+
+  # ── Redis (lightweight feature store cache) ────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ardp-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+        --maxmemory 128mb
+        --maxmemory-policy allkeys-lru
+        --save ""
+        --appendonly no
+    mem_limit: 150m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - ardp-net
+
+  # ── nginx (TLS termination + WebSocket proxy) ──────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ardp-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      - nginx-logs:/var/log/nginx
+    mem_limit: 64m
+    depends_on:
+      - api
+    networks:
+      - ardp-net
+
+volumes:
+  mlruns:
+  reports:
+  nginx-logs:
+
+networks:
+  ardp-net:
+    driver: bridge

@@ -33,6 +33,7 @@ class MockModel:
         X = np.atleast_2d(X)
         scores = 1 / (1 + np.exp(-X.sum(axis=1)))
         return np.vstack([1 - scores, scores]).T
+
     def fit(self, X, y):
         pass
 
@@ -126,6 +127,7 @@ class TestStreamingPipeline:
         service = RealtimeInferenceService(mock_model, input_dim=10)
         batch = [{"features": [0.0] * 20, "label": 0} for _ in range(10)]
         service.predict_batch(batch)
+
         health = service.health_check()
         assert health["inferences"] == 10
         assert health["latency_p99_ms"] > 0
@@ -163,6 +165,7 @@ class TestFeatureStore:
         fs.put("k1", np.array([1.0]))
         fs.put("k2", np.array([2.0]))
         fs.put("k3", np.array([3.0]))
+
         assert fs.get("k1") is None  # Evicted
         assert fs.get("k2") is not None
 

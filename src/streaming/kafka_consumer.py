@@ -9,10 +9,7 @@ Includes:
     - Sliding window aggregation (1-min, 5-min, 15-min)
     - Consumer group management for horizontal scaling
     - In-memory bus fallback for local dev/testing
-<<<<<<< HEAD
-=======
     - Preallocated aggregation buffers for reduced allocation overhead
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 ================================================================================
 """
 
@@ -20,10 +17,6 @@ import time
 import json
 import queue
 import logging
-<<<<<<< HEAD
-import threading
-=======
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 import numpy as np
 from collections import deque
 from typing import Optional, Dict, Any, List, Callable
@@ -50,49 +43,23 @@ class SlidingWindowAggregator:
         self._buffers: Dict[float, deque] = {
             w: deque() for w in self.window_sizes
         }
-<<<<<<< HEAD
-=======
         # Each window produces: mean(n_features) + std(n_features) + count(1)
         self._agg_dim_per_window = n_features * 2 + 1
         self._total_agg_dim = self._agg_dim_per_window * len(self.window_sizes)
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 
     def update(self, features: np.ndarray, timestamp: float):
         """Add a new observation and prune expired entries."""
         for w in self.window_sizes:
-<<<<<<< HEAD
-            self._buffers[w].append((timestamp, features))
-            # Prune expired
-            while self._buffers[w] and (timestamp - self._buffers[w][0][0]) > w:
-                self._buffers[w].popleft()
-=======
             buf = self._buffers[w]
             buf.append((timestamp, features))
             # Prune expired — check oldest entry
             while buf and (timestamp - buf[0][0]) > w:
                 buf.popleft()
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 
     def aggregate(self) -> np.ndarray:
         """
         Compute aggregation statistics across all windows.
 
-<<<<<<< HEAD
-        Returns array of: [mean, std, count] × each window × each feature
-        This gets appended to the raw feature vector.
-        """
-        agg = []
-        for w in self.window_sizes:
-            if len(self._buffers[w]) == 0:
-                # No data in window — return zeros
-                agg.extend([0.0] * (self.n_features * 2 + 1))
-            else:
-                data = np.array([f for _, f in self._buffers[w]])
-                agg.extend(np.mean(data, axis=0).tolist())
-                agg.extend(np.std(data, axis=0).tolist())
-                agg.append(float(len(data)))
-        return np.array(agg, dtype=np.float32)
-=======
         Returns array of: [mean, std, count] × each window
         """
         agg = np.zeros(self._total_agg_dim, dtype=np.float32)
@@ -112,7 +79,6 @@ class SlidingWindowAggregator:
             offset += self._agg_dim_per_window
 
         return agg
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
 
 
 class FlowConsumer:
@@ -176,28 +142,14 @@ class FlowConsumer:
             self._output_bus = _InMemoryBus.get_topic(self.output_topic)
 
     def process_record(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-<<<<<<< HEAD
-        """
-        Process a single flow record: transform features + add window aggs.
-        """
-=======
         """Process a single flow record: transform features + add window aggs."""
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
         try:
             raw = np.array(record["features"], dtype=np.float32)
             ts = record.get("timestamp", time.time())
 
-<<<<<<< HEAD
-            # Apply custom transform if provided
             if self.feature_transform:
                 raw = self.feature_transform(raw)
 
-            # Update sliding windows
-=======
-            if self.feature_transform:
-                raw = self.feature_transform(raw)
-
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
             self.aggregator.update(raw, ts)
             window_feats = self.aggregator.aggregate()
 
@@ -216,10 +168,6 @@ class FlowConsumer:
     def consume_one(self, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
         """Consume and process a single record (pull mode)."""
         if self._use_kafka:
-<<<<<<< HEAD
-            # kafka poll returns batches
-=======
->>>>>>> ef9ed20b07fceb0d5330bca702b5d7f7559e786e
             msgs = self._consumer.poll(timeout_ms=int(timeout * 1000), max_records=1)
             for _, records in msgs.items():
                 for msg in records:
