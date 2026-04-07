@@ -68,8 +68,9 @@ class PageHinkleyDetector:
     Useful for monitoring error rates.
     """
 
-    def __init__(self, delta: float = 0.005, lambda_threshold: float = 50,
-                 alpha: float = 0.9999):
+    def __init__(
+        self, delta: float = 0.005, lambda_threshold: float = 50, alpha: float = 0.9999
+    ):
         self.delta = delta
         self.lambda_threshold = lambda_threshold
         self.alpha = alpha
@@ -118,9 +119,7 @@ class KSDetector:
         drifted = []
 
         for i in range(self.n_features):
-            stat, p_val = stats.ks_2samp(
-                self.reference_data[:, i], current_data[:, i]
-            )
+            stat, p_val = stats.ks_2samp(self.reference_data[:, i], current_data[:, i])
             p_values[i] = p_val
             if p_val < corrected_alpha:
                 drifted.append(i)
@@ -140,16 +139,20 @@ class MMDDetector:
     Uses the unbiased estimator of MMD².
     """
 
-    def __init__(self, reference_data: np.ndarray, alpha: float = 0.05,
-                 bandwidth: Optional[float] = None):
+    def __init__(
+        self,
+        reference_data: np.ndarray,
+        alpha: float = 0.05,
+        bandwidth: Optional[float] = None,
+    ):
         self.reference_data = reference_data
         self.alpha = alpha
 
         # Median heuristic for bandwidth if not provided
         if bandwidth is None:
             dists = np.linalg.norm(
-                reference_data[:min(500, len(reference_data)), None]
-                - reference_data[None, :min(500, len(reference_data))],
+                reference_data[: min(500, len(reference_data)), None]
+                - reference_data[None, : min(500, len(reference_data))],
                 axis=-1,
             )
             self.bandwidth = float(np.median(dists[dists > 0])) + 1e-8
@@ -161,10 +164,10 @@ class MMDDetector:
 
     def _rbf_kernel(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         """Compute RBF (Gaussian) kernel matrix."""
-        sq_X = np.sum(X ** 2, axis=1, keepdims=True)
-        sq_Y = np.sum(Y ** 2, axis=1, keepdims=True)
+        sq_X = np.sum(X**2, axis=1, keepdims=True)
+        sq_Y = np.sum(Y**2, axis=1, keepdims=True)
         dists_sq = sq_X + sq_Y.T - 2 * X @ Y.T
-        return np.exp(-dists_sq / (2 * self.bandwidth ** 2))
+        return np.exp(-dists_sq / (2 * self.bandwidth**2))
 
     def _kernel_mean(self, X: np.ndarray, Y: np.ndarray) -> float:
         K = self._rbf_kernel(X, Y)
@@ -223,8 +226,7 @@ class ConceptDriftEngine:
     Triggers retraining only if ≥ 2 detectors agree that drift has occurred.
     """
 
-    def __init__(self, reference_features: np.ndarray,
-                 consensus_threshold: int = 2):
+    def __init__(self, reference_features: np.ndarray, consensus_threshold: int = 2):
         self.adwin = ADWINDetector()
         self.ph = PageHinkleyDetector()
         self.ks = KSDetector(reference_features)
@@ -232,8 +234,9 @@ class ConceptDriftEngine:
         self.consensus_threshold = consensus_threshold
         self._last_results: Dict[str, bool] = {}
 
-    def evaluate(self, current_batch: np.ndarray,
-                 prediction_errors: List[float]) -> bool:
+    def evaluate(
+        self, current_batch: np.ndarray, prediction_errors: List[float]
+    ) -> bool:
         """
         Evaluate if concept drift has occurred.
         Requires ≥ consensus_threshold detectors to agree.

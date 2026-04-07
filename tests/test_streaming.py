@@ -17,18 +17,29 @@ import pytest
 import numpy as np
 import time
 
-from src.streaming import FlowProducer, FlowConsumer, RealtimeInferenceService, FeatureStore
+from src.streaming import (
+    FlowProducer,
+    FlowConsumer,
+    RealtimeInferenceService,
+    FeatureStore,
+)
 from src.streaming.kafka_producer import _InMemoryBus
 from src.drift import (
-    ConceptDriftEngine, ADWINDetector, PageHinkleyDetector,
-    KSDetector, MMDDetector, AdaptiveRetrainingPipeline,
+    ConceptDriftEngine,
+    ADWINDetector,
+    PageHinkleyDetector,
+    KSDetector,
+    MMDDetector,
+    AdaptiveRetrainingPipeline,
 )
 
 
 # ── MOCK MODEL ─────────────────────────────────────────────────
 
+
 class MockModel:
     """Simple model that predicts malicious if sum of features > 0."""
+
     def predict_proba(self, X):
         X = np.atleast_2d(X)
         scores = 1 / (1 + np.exp(-X.sum(axis=1)))
@@ -63,11 +74,14 @@ def sample_data():
 # 1. STREAMING PIPELINE TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestStreamingPipeline:
     def test_producer_consumer_roundtrip(self):
         """Test message integrity through the in-memory bus."""
         producer = FlowProducer(topic="test-roundtrip")
-        consumer = FlowConsumer(input_topic="test-roundtrip", output_topic="test-enriched")
+        consumer = FlowConsumer(
+            input_topic="test-roundtrip", output_topic="test-enriched"
+        )
 
         record = {"features": [1.0] * 10, "label": 1, "timestamp": time.time()}
         producer.send(record)
@@ -144,7 +158,9 @@ class TestStreamingPipeline:
     def test_inference_batch_vectorised(self, mock_model):
         """Test that batch prediction returns correct structure."""
         service = RealtimeInferenceService(mock_model, input_dim=10)
-        batch = [{"features": [1.0] * 10, "label": 1, "timestamp": 123.0} for _ in range(3)]
+        batch = [
+            {"features": [1.0] * 10, "label": 1, "timestamp": 123.0} for _ in range(3)
+        ]
         results = service.predict_batch(batch)
 
         assert len(results) == 3
@@ -157,6 +173,7 @@ class TestStreamingPipeline:
 # ═══════════════════════════════════════════════════════════════
 # 2. FEATURE STORE TESTS
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestFeatureStore:
     def test_lru_cache_behavior(self):
@@ -216,6 +233,7 @@ class TestFeatureStore:
 # 3. DRIFT DETECTION TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestDriftDetection:
     def test_adwin_sensitivity(self):
         """Test ADWIN detects mean shift in stream."""
@@ -233,7 +251,9 @@ class TestDriftDetection:
         """Test ADWIN doesn't fire on stable stream."""
         detector = ADWINDetector(delta=0.01, window_size=100)
         rng = np.random.RandomState(42)
-        drifts = sum(1 for _ in range(200) if detector.update(0.5 + rng.normal(0, 0.01)))
+        drifts = sum(
+            1 for _ in range(200) if detector.update(0.5 + rng.normal(0, 0.01))
+        )
         assert drifts == 0
 
     def test_adwin_reset(self):
@@ -302,6 +322,7 @@ class TestDriftDetection:
 # 4. ADAPTIVE RETRAINING TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestAdaptiveRetraining:
     def test_validation_gate_promotion(self, mock_model, sample_data):
         """Test that a good model is promoted when gate is 0."""
@@ -319,6 +340,7 @@ class TestAdaptiveRetraining:
         class BadModel:
             def predict_proba(self, X):
                 return np.full((len(X), 2), 0.5)
+
             def fit(self, X, y):
                 pass
 
@@ -362,6 +384,7 @@ class TestAdaptiveRetraining:
 # ═══════════════════════════════════════════════════════════════
 # 5. HEALTH & ERROR HANDLING TESTS
 # ═════════════════════════════════════════════��═════════════════
+
 
 def test_inference_health_degraded_on_high_latency(mock_model):
     """Test health check reports degraded when latency exceeds target."""

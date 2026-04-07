@@ -39,8 +39,14 @@ class RealtimeInferenceService:
         Multiplier on latency_target_ms that triggers degraded status.
     """
 
-    def __init__(self, model, conformal_engine=None, input_dim: int = 10,
-                 latency_target_ms: float = 50.0, degraded_multiplier: float = 2.0):
+    def __init__(
+        self,
+        model,
+        conformal_engine=None,
+        input_dim: int = 10,
+        latency_target_ms: float = 50.0,
+        degraded_multiplier: float = 2.0,
+    ):
         self.model = model
         self.conformal_engine = conformal_engine
         self.input_dim = input_dim
@@ -75,7 +81,7 @@ class RealtimeInferenceService:
 
         t0 = time.perf_counter()
 
-        x = np.asarray(features[:self.input_dim], dtype=np.float32).reshape(1, -1)
+        x = np.asarray(features[: self.input_dim], dtype=np.float32).reshape(1, -1)
         probs = self.model.predict_proba(x)[0]
         pred_label = int(np.argmax(probs))
 
@@ -119,7 +125,10 @@ class RealtimeInferenceService:
 
         # Vectorised feature extraction
         raw_matrix = np.array(
-            [np.array(r["features"], dtype=np.float32)[:self.input_dim] for r in batch],
+            [
+                np.array(r["features"], dtype=np.float32)[: self.input_dim]
+                for r in batch
+            ],
             dtype=np.float32,
         )
 
@@ -152,15 +161,17 @@ class RealtimeInferenceService:
             if per_record_latency > self.latency_target_ms:
                 self.stats["latency_violations"] += 1
 
-            results.append({
-                "prediction": pred_label,
-                "probabilities": probs_matrix[i].tolist(),
-                "prediction_set": pred_set,
-                "uncertainty": "HIGH" if len(pred_set) > 1 else "LOW",
-                "latency_ms": round(per_record_latency, 3),
-                "label_true": record.get("label", -1),
-                "timestamp": record.get("timestamp", time.time()),
-            })
+            results.append(
+                {
+                    "prediction": pred_label,
+                    "probabilities": probs_matrix[i].tolist(),
+                    "prediction_set": pred_set,
+                    "uncertainty": "HIGH" if len(pred_set) > 1 else "LOW",
+                    "latency_ms": round(per_record_latency, 3),
+                    "label_true": record.get("label", -1),
+                    "timestamp": record.get("timestamp", time.time()),
+                }
+            )
 
         return results
 

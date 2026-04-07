@@ -40,9 +40,12 @@ class FeatureStore:
         Feature schema version for compatibility tracking.
     """
 
-    def __init__(self, redis_url: Optional[str] = None,
-                 max_memory_items: int = 50_000,
-                 schema_version: str = "v1.0"):
+    def __init__(
+        self,
+        redis_url: Optional[str] = None,
+        max_memory_items: int = 50_000,
+        schema_version: str = "v1.0",
+    ):
         self.schema_version = schema_version
         self.max_memory_items = max_memory_items
         self._cache: OrderedDict = OrderedDict()
@@ -52,6 +55,7 @@ class FeatureStore:
         if redis_url:
             try:
                 import redis
+
                 self._redis = redis.Redis.from_url(redis_url, decode_responses=True)
                 self._redis.ping()
                 logger.info(f"FeatureStore connected to Redis at {redis_url}")
@@ -142,7 +146,9 @@ class FeatureStore:
         for i, key in enumerate(keys):
             self.put(key, features_batch[i])
 
-    def get_batch(self, keys: List[str], expected_dim: Optional[int] = None) -> List[Optional[np.ndarray]]:
+    def get_batch(
+        self, keys: List[str], expected_dim: Optional[int] = None
+    ) -> List[Optional[np.ndarray]]:
         """
         Retrieve a batch. Returns list of arrays (None for missing keys).
 
@@ -185,9 +191,12 @@ class FeatureStore:
     # Training–serving consistency
     # ------------------------------------------------------------------
 
-    def check_skew(self, training_features: np.ndarray,
-                   serving_features: np.ndarray,
-                   threshold: float = 0.1) -> Dict[str, Any]:
+    def check_skew(
+        self,
+        training_features: np.ndarray,
+        serving_features: np.ndarray,
+        threshold: float = 0.1,
+    ) -> Dict[str, Any]:
         """
         Detect training-serving feature skew via Z-score comparison.
 

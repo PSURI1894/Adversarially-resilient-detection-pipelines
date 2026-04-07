@@ -31,8 +31,16 @@ logger = logging.getLogger(__name__)
 FLOW_SCHEMA = {
     "type": "record",
     "name": "NetworkFlow",
-    "fields": ["timestamp", "src_ip", "dst_ip", "src_port", "dst_port",
-               "protocol", "features", "label"],
+    "fields": [
+        "timestamp",
+        "src_ip",
+        "dst_ip",
+        "src_port",
+        "dst_port",
+        "protocol",
+        "features",
+        "label",
+    ],
 }
 
 _REQUIRED_FIELDS = frozenset({"features"})
@@ -47,8 +55,10 @@ def validate_flow(record: Dict[str, Any]) -> bool:
 
 # ── IN-MEMORY BUS (Kafka fallback) ────────────────────────────
 
+
 class _InMemoryBus:
     """Thread-safe in-memory message bus for testing without Kafka."""
+
     _topics: Dict[str, queue.Queue] = {}
     _lock = threading.Lock()
 
@@ -67,6 +77,7 @@ class _InMemoryBus:
 
 # ── PRODUCER ───────────────────────────────────────────────────
 
+
 class FlowProducer:
     """
     Publishes network flow records to a Kafka topic (or in-memory bus).
@@ -83,10 +94,13 @@ class FlowProducer:
         Internal buffer size for back-pressure.
     """
 
-    def __init__(self, topic: str = "raw-traffic",
-                 bootstrap_servers: Optional[str] = None,
-                 throttle_rps: float = 0,
-                 buffer_size: int = 10_000):
+    def __init__(
+        self,
+        topic: str = "raw-traffic",
+        bootstrap_servers: Optional[str] = None,
+        throttle_rps: float = 0,
+        buffer_size: int = 10_000,
+    ):
         self.topic = topic
         self.throttle_rps = throttle_rps
         self.buffer_size = buffer_size
@@ -97,6 +111,7 @@ class FlowProducer:
         if bootstrap_servers:
             try:
                 from kafka import KafkaProducer
+
                 self._kafka_producer = KafkaProducer(
                     bootstrap_servers=bootstrap_servers,
                     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
@@ -107,7 +122,9 @@ class FlowProducer:
                 self._use_kafka = True
                 logger.info(f"Kafka producer connected to {bootstrap_servers}")
             except Exception as e:
-                logger.warning(f"Kafka unavailable ({e}), falling back to in-memory bus")
+                logger.warning(
+                    f"Kafka unavailable ({e}), falling back to in-memory bus"
+                )
 
         if not self._use_kafka:
             self._bus = _InMemoryBus.get_topic(self.topic)
@@ -140,9 +157,14 @@ class FlowProducer:
             if delay > 0:
                 time.sleep(delay)
 
-    def publish_csv(self, csv_path: str, feature_columns: Optional[List[str]] = None,
-                    label_column: str = "label", max_rows: Optional[int] = None,
-                    chunk_size: int = 10_000):
+    def publish_csv(
+        self,
+        csv_path: str,
+        feature_columns: Optional[List[str]] = None,
+        label_column: str = "label",
+        max_rows: Optional[int] = None,
+        chunk_size: int = 10_000,
+    ):
         """
         Read a CSV file and publish each row as a flow record.
 
@@ -168,7 +190,11 @@ class FlowProducer:
                 feature_columns = [c for c in chunk.columns if c != label_column]
 
             feats = chunk[feature_columns].values
-            labels = chunk[label_column].values if label_column in chunk.columns else np.full(len(chunk), -1)
+            labels = (
+                chunk[label_column].values
+                if label_column in chunk.columns
+                else np.full(len(chunk), -1)
+            )
             now = time.time()
 
             for i in range(len(chunk)):

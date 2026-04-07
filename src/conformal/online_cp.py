@@ -38,8 +38,9 @@ class OnlineConformalPredictor:
         Exponential weight decay. 1.0 = no forgetting, 0.9 = recent 10× more important.
     """
 
-    def __init__(self, alpha=0.05, gamma=0.01, window_size=5000,
-                 forgetting_factor=0.995):
+    def __init__(
+        self, alpha=0.05, gamma=0.01, window_size=5000, forgetting_factor=0.995
+    ):
         self.alpha_target = alpha
         self.alpha_current = alpha
         self.gamma = gamma
@@ -83,7 +84,9 @@ class OnlineConformalPredictor:
 
         # ACI update: adjust alpha
         err_t = 1 - covered
-        self.alpha_current = self.alpha_current + self.gamma * (self.alpha_target - err_t)
+        self.alpha_current = self.alpha_current + self.gamma * (
+            self.alpha_target - err_t
+        )
         self.alpha_current = np.clip(self.alpha_current, 0.001, 0.5)
         self.alpha_history.append(self.alpha_current)
 
@@ -123,9 +126,7 @@ class OnlineConformalPredictor:
         n = len(scores)
 
         # Build decaying weights: most recent has weight 1.0
-        weights = np.array([
-            self.forgetting_factor ** (n - 1 - i) for i in range(n)
-        ])
+        weights = np.array([self.forgetting_factor ** (n - 1 - i) for i in range(n)])
         weights /= weights.sum()
 
         # Weighted quantile
@@ -186,8 +187,9 @@ class OnlineConformalPredictor:
         # Count runs
         runs = 1 + np.sum(np.diff(seq) != 0)
         expected = 1 + 2 * n1 * n0 / (n1 + n0)
-        variance = (2 * n1 * n0 * (2 * n1 * n0 - n1 - n0)) / \
-                   ((n1 + n0) ** 2 * (n1 + n0 - 1)) + 1e-8
+        variance = (2 * n1 * n0 * (2 * n1 * n0 - n1 - n0)) / (
+            (n1 + n0) ** 2 * (n1 + n0 - 1)
+        ) + 1e-8
         z = (runs - expected) / np.sqrt(variance)
 
         # |z| > 2 → reject exchangeability at ~95% confidence
@@ -207,7 +209,9 @@ class OnlineConformalPredictor:
     def rolling_coverage(self, window=100):
         """Compute rolling empirical coverage over last `window` predictions."""
         if len(self.coverage_history) < window:
-            return float(np.mean(self.coverage_history)) if self.coverage_history else 0.0
+            return (
+                float(np.mean(self.coverage_history)) if self.coverage_history else 0.0
+            )
         return float(np.mean(self.coverage_history[-window:]))
 
     def get_diagnostics(self):

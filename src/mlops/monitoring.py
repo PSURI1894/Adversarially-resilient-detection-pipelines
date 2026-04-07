@@ -30,9 +30,13 @@ logger = logging.getLogger(__name__)
 _PROM_AVAILABLE = False
 try:
     from prometheus_client import (
-        Histogram, Counter, Gauge, Info,
+        Histogram,
+        Counter,
+        Gauge,
+        Info,
         start_http_server,
     )
+
     _PROM_AVAILABLE = True
 except ImportError:
     pass
@@ -52,8 +56,12 @@ class ProductionMonitor:
         Directory for generated Grafana dashboard JSON.
     """
 
-    def __init__(self, port: int = 9090, enable_server: bool = False,
-                 dashboard_output_dir: str = "reports/dashboards"):
+    def __init__(
+        self,
+        port: int = 9090,
+        enable_server: bool = False,
+        dashboard_output_dir: str = "reports/dashboards",
+    ):
         self.port = port
         self.dashboard_dir = Path(dashboard_output_dir)
         self.dashboard_dir.mkdir(parents=True, exist_ok=True)
@@ -178,36 +186,43 @@ class ProductionMonitor:
         latencies = [m["value"] for m in self._local_metrics.get("latency_ms", [])]
         if latencies:
             import numpy as np
+
             p99 = float(np.percentile(latencies[-1000:], 99))
             if p99 > 100:
-                alerts.append({
-                    "rule": "latency_high",
-                    "severity": "warning",
-                    "message": f"P99 latency {p99:.1f}ms > 100ms threshold",
-                    "value": p99,
-                })
+                alerts.append(
+                    {
+                        "rule": "latency_high",
+                        "severity": "warning",
+                        "message": f"P99 latency {p99:.1f}ms > 100ms threshold",
+                        "value": p99,
+                    }
+                )
 
         set_sizes = self._local_metrics.get("set_size", [])
         if set_sizes:
             latest = set_sizes[-1]["value"]
             if latest > 1.5:
-                alerts.append({
-                    "rule": "uncertainty_high",
-                    "severity": "critical",
-                    "message": f"Avg set size {latest:.2f} > 1.5 threshold",
-                    "value": latest,
-                })
+                alerts.append(
+                    {
+                        "rule": "uncertainty_high",
+                        "severity": "critical",
+                        "message": f"Avg set size {latest:.2f} > 1.5 threshold",
+                        "value": latest,
+                    }
+                )
 
         drift_scores = self._local_metrics.get("drift_score", [])
         if drift_scores:
             latest = drift_scores[-1]["value"]
             if latest > 0.5:
-                alerts.append({
-                    "rule": "drift_detected",
-                    "severity": "warning",
-                    "message": f"Drift score {latest:.3f} > 0.5 threshold",
-                    "value": latest,
-                })
+                alerts.append(
+                    {
+                        "rule": "drift_detected",
+                        "severity": "warning",
+                        "message": f"Drift score {latest:.3f} > 0.5 threshold",
+                        "value": latest,
+                    }
+                )
 
         return alerts
 
@@ -229,8 +244,12 @@ class ProductionMonitor:
                         "type": "timeseries",
                         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
                         "targets": [
-                            {"expr": "histogram_quantile(0.50, rate(ids_prediction_latency_ms_bucket[5m]))"},
-                            {"expr": "histogram_quantile(0.99, rate(ids_prediction_latency_ms_bucket[5m]))"},
+                            {
+                                "expr": "histogram_quantile(0.50, rate(ids_prediction_latency_ms_bucket[5m]))"
+                            },
+                            {
+                                "expr": "histogram_quantile(0.99, rate(ids_prediction_latency_ms_bucket[5m]))"
+                            },
                         ],
                     },
                     {

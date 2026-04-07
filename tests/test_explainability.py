@@ -6,6 +6,7 @@ TEST SUITE — EXPLAINABILITY & ADVERSARIAL DETECTION (XAI LAYER)
 Feature Sensitivity Analysis, and Incident Report Generation.
 ================================================================================
 """
+
 import pytest
 import numpy as np
 import os
@@ -15,8 +16,10 @@ import tempfile
 
 # ── MOCK MODEL ─────────────────────────────────────────────────
 
+
 class MockModel:
     """Returns probabilities based on feature sum."""
+
     def predict_proba(self, X):
         X = np.atleast_2d(X)
         scores = 1 / (1 + np.exp(-X.sum(axis=1)))
@@ -38,20 +41,34 @@ def sample_data():
 
 @pytest.fixture
 def feature_names():
-    return ["flow_iat_mean", "pkt_count", "bytes_sent", "duration",
-            "src_port", "dst_port", "flags", "protocol"]
+    return [
+        "flow_iat_mean",
+        "pkt_count",
+        "bytes_sent",
+        "duration",
+        "src_port",
+        "dst_port",
+        "flags",
+        "protocol",
+    ]
 
 
 # ═══════════════════════════════════════════════════════════════
 # 1. SHAP EXPLAINER TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestSHAPExplainer:
     def test_local_explanation_keys(self, mock_model, sample_data, feature_names):
         from src.explainability.shap_engine import SHAPExplainer
+
         X, _ = sample_data
-        explainer = SHAPExplainer(mock_model, mode="kernel",
-                                  background_data=X[:20], feature_names=feature_names)
+        explainer = SHAPExplainer(
+            mock_model,
+            mode="kernel",
+            background_data=X[:20],
+            feature_names=feature_names,
+        )
         result = explainer.explain_instance(X[0])
         assert "shap_values" in result
         assert "base_value" in result
@@ -60,6 +77,7 @@ class TestSHAPExplainer:
 
     def test_shap_values_shape(self, mock_model, sample_data):
         from src.explainability.shap_engine import SHAPExplainer
+
         X, _ = sample_data
         explainer = SHAPExplainer(mock_model, mode="kernel", background_data=X[:20])
         result = explainer.explain_instance(X[0])
@@ -67,6 +85,7 @@ class TestSHAPExplainer:
 
     def test_batch_explanation_shape(self, mock_model, sample_data):
         from src.explainability.shap_engine import SHAPExplainer
+
         X, _ = sample_data
         explainer = SHAPExplainer(mock_model, mode="kernel", background_data=X[:20])
         vals = explainer.explain_batch(X[:10])
@@ -74,9 +93,14 @@ class TestSHAPExplainer:
 
     def test_global_importance_ranking(self, mock_model, sample_data, feature_names):
         from src.explainability.shap_engine import SHAPExplainer
+
         X, _ = sample_data
-        explainer = SHAPExplainer(mock_model, mode="kernel",
-                                  background_data=X[:20], feature_names=feature_names)
+        explainer = SHAPExplainer(
+            mock_model,
+            mode="kernel",
+            background_data=X[:20],
+            feature_names=feature_names,
+        )
         imp = explainer.global_importance(X[:15])
         assert len(imp) == len(feature_names)
         # Values should be sorted descending
@@ -86,6 +110,7 @@ class TestSHAPExplainer:
     def test_shap_completeness_approximation(self, mock_model, sample_data):
         """SHAP values should approximately sum to prediction - base_value."""
         from src.explainability.shap_engine import SHAPExplainer
+
         X, _ = sample_data
         explainer = SHAPExplainer(mock_model, mode="kernel", background_data=X[:30])
         result = explainer.explain_instance(X[0])
@@ -99,9 +124,11 @@ class TestSHAPExplainer:
 # 2. LIME EXPLAINER TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestLIMEExplainer:
     def test_local_explanation_keys(self, mock_model, sample_data, feature_names):
         from src.explainability.lime_engine import LIMEExplainer
+
         X, _ = sample_data
         explainer = LIMEExplainer(mock_model, feature_names=feature_names)
         result = explainer.explain_instance(X[0])
@@ -112,6 +139,7 @@ class TestLIMEExplainer:
 
     def test_fidelity_positive(self, mock_model, sample_data):
         from src.explainability.lime_engine import LIMEExplainer
+
         X, _ = sample_data
         explainer = LIMEExplainer(mock_model, n_samples=200)
         result = explainer.explain_instance(X[0])
@@ -120,6 +148,7 @@ class TestLIMEExplainer:
 
     def test_immutable_features_respected(self, mock_model, sample_data):
         from src.explainability.lime_engine import LIMEExplainer
+
         X, _ = sample_data
         # Mark features 4,5 as immutable
         explainer = LIMEExplainer(mock_model, immutable_features=[4, 5])
@@ -129,6 +158,7 @@ class TestLIMEExplainer:
 
     def test_batch_explanations(self, mock_model, sample_data):
         from src.explainability.lime_engine import LIMEExplainer
+
         X, _ = sample_data
         explainer = LIMEExplainer(mock_model, n_samples=100)
         results = explainer.explain_batch(X[:5])
@@ -137,6 +167,7 @@ class TestLIMEExplainer:
 
     def test_fidelity_assessment(self, mock_model, sample_data):
         from src.explainability.lime_engine import LIMEExplainer
+
         X, _ = sample_data
         explainer = LIMEExplainer(mock_model, n_samples=200)
         assess = explainer.assess_fidelity(X, n_trials=5)
@@ -148,10 +179,14 @@ class TestLIMEExplainer:
 # 3. ATTRIBUTION FINGERPRINT DETECTOR TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestAttributionFingerprintDetector:
     def test_fit_and_score(self, mock_model, sample_data):
         from src.explainability.shap_engine import SHAPExplainer
-        from src.explainability.adversarial_detector import AttributionFingerprintDetector
+        from src.explainability.adversarial_detector import (
+            AttributionFingerprintDetector,
+        )
+
         X, _ = sample_data
         shap_exp = SHAPExplainer(mock_model, mode="kernel", background_data=X[:20])
         detector = AttributionFingerprintDetector(shap_exp, n_components=2)
@@ -161,7 +196,10 @@ class TestAttributionFingerprintDetector:
 
     def test_detect_returns_structure(self, mock_model, sample_data):
         from src.explainability.shap_engine import SHAPExplainer
-        from src.explainability.adversarial_detector import AttributionFingerprintDetector
+        from src.explainability.adversarial_detector import (
+            AttributionFingerprintDetector,
+        )
+
         X, _ = sample_data
         shap_exp = SHAPExplainer(mock_model, mode="kernel", background_data=X[:20])
         detector = AttributionFingerprintDetector(shap_exp, n_components=2)
@@ -175,11 +213,15 @@ class TestAttributionFingerprintDetector:
     def test_adversarial_samples_flagged_more(self, mock_model, sample_data):
         """Perturbed samples should have higher anomaly scores on average."""
         from src.explainability.shap_engine import SHAPExplainer
-        from src.explainability.adversarial_detector import AttributionFingerprintDetector
+        from src.explainability.adversarial_detector import (
+            AttributionFingerprintDetector,
+        )
+
         X, _ = sample_data
         shap_exp = SHAPExplainer(mock_model, mode="kernel", background_data=X[:20])
-        detector = AttributionFingerprintDetector(shap_exp, n_components=2,
-                                                   threshold_percentile=90)
+        detector = AttributionFingerprintDetector(
+            shap_exp, n_components=2, threshold_percentile=90
+        )
         detector.fit(X[:80])
         # Clean scores
         clean_scores = detector.score(X[80:100])
@@ -194,9 +236,11 @@ class TestAttributionFingerprintDetector:
 # 4. FEATURE SENSITIVITY ANALYZER TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestFeatureSensitivityAnalyzer:
     def test_sensitivity_shape(self, mock_model, sample_data):
         from src.explainability.adversarial_detector import FeatureSensitivityAnalyzer
+
         X, _ = sample_data
         analyzer = FeatureSensitivityAnalyzer(mock_model)
         sens = analyzer.compute_sensitivity(X[:20])
@@ -205,6 +249,7 @@ class TestFeatureSensitivityAnalyzer:
 
     def test_vulnerability_report_keys(self, mock_model, sample_data, feature_names):
         from src.explainability.adversarial_detector import FeatureSensitivityAnalyzer
+
         X, _ = sample_data
         analyzer = FeatureSensitivityAnalyzer(mock_model, feature_names=feature_names)
         report = analyzer.vulnerability_report(X[:20], top_k=3)
@@ -219,14 +264,19 @@ class TestFeatureSensitivityAnalyzer:
 # 5. INCIDENT REPORT GENERATOR TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestIncidentReporter:
     def test_report_structure(self, feature_names):
         from src.explainability.report_generator import IncidentReporter
+
         reporter = IncidentReporter(feature_names=feature_names)
         sample = np.random.randn(8)
         report = reporter.generate_report(
-            sample=sample, prediction=0.85,
-            prediction_set=[1], risk_score=45.0, soc_state="SUSPICIOUS"
+            sample=sample,
+            prediction=0.85,
+            prediction_set=[1],
+            risk_score=45.0,
+            soc_state="SUSPICIOUS",
         )
         assert "alert_id" in report
         assert "severity" in report
@@ -235,28 +285,38 @@ class TestIncidentReporter:
 
     def test_severity_priority_mapping(self, feature_names):
         from src.explainability.report_generator import IncidentReporter
+
         reporter = IncidentReporter(feature_names=feature_names)
         sample = np.random.randn(8)
         # High-severity case
         report_hi = reporter.generate_report(
-            sample=sample, prediction=0.95,
-            prediction_set=[0, 1], risk_score=80.0, soc_state="FAILURE"
+            sample=sample,
+            prediction=0.95,
+            prediction_set=[0, 1],
+            risk_score=80.0,
+            soc_state="FAILURE",
         )
         assert report_hi["priority"] == "P1-CRITICAL"
         # Low-severity case
         report_lo = reporter.generate_report(
-            sample=sample, prediction=0.1,
-            prediction_set=[0], risk_score=5.0, soc_state="STABLE"
+            sample=sample,
+            prediction=0.1,
+            prediction_set=[0],
+            risk_score=5.0,
+            soc_state="STABLE",
         )
         assert report_lo["priority"] == "P4-LOW"
 
     def test_json_export(self, feature_names):
         from src.explainability.report_generator import IncidentReporter
+
         with tempfile.TemporaryDirectory() as tmpdir:
             reporter = IncidentReporter(output_dir=tmpdir, feature_names=feature_names)
             report = reporter.generate_report(
-                sample=np.zeros(8), prediction=0.7,
-                prediction_set=[1], alert_id="TEST-001"
+                sample=np.zeros(8),
+                prediction=0.7,
+                prediction_set=[1],
+                alert_id="TEST-001",
             )
             path = reporter.export_json(report)
             assert os.path.exists(path)
@@ -266,11 +326,14 @@ class TestIncidentReporter:
 
     def test_html_export(self, feature_names):
         from src.explainability.report_generator import IncidentReporter
+
         with tempfile.TemporaryDirectory() as tmpdir:
             reporter = IncidentReporter(output_dir=tmpdir, feature_names=feature_names)
             report = reporter.generate_report(
-                sample=np.zeros(8), prediction=0.9,
-                prediction_set=[0, 1], soc_state="EVASION_LOCKED"
+                sample=np.zeros(8),
+                prediction=0.9,
+                prediction_set=[0, 1],
+                soc_state="EVASION_LOCKED",
             )
             path = reporter.export_html(report)
             assert os.path.exists(path)
@@ -281,6 +344,7 @@ class TestIncidentReporter:
 
     def test_csv_batch_export(self, feature_names):
         from src.explainability.report_generator import IncidentReporter
+
         with tempfile.TemporaryDirectory() as tmpdir:
             reporter = IncidentReporter(output_dir=tmpdir, feature_names=feature_names)
             reports = reporter.generate_batch_reports(

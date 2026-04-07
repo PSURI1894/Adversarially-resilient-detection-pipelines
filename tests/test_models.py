@@ -2,21 +2,23 @@
 PERSON 2: TEST SUITE (Ensemble & Training)
 Lines: ~200-250
 """
+
 import pytest
 import numpy as np
 from src.detection_ensemble import ResilientTrainer, EnsembleOrchestrator
+
 
 class TestModelLogic:
     def test_cnn_architecture_shapes(self):
         """Verifies CNN input/output compatibility for 1D network flows."""
         input_dim = 20
-        config = {'input_dim': input_dim}
+        config = {"input_dim": input_dim}
         trainer = ResilientTrainer("CNN", config)
-        
+
         # Create a dummy batch (BatchSize=8, Features=20, Channels=1)
         test_input = np.random.rand(8, input_dim, 1)
         prediction = trainer.model.predict(test_input, verbose=0)
-        
+
         assert prediction.shape == (8, 1)
         assert (prediction >= 0).all() and (prediction <= 1).all()
 

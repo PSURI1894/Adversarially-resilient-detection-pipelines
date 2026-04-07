@@ -44,9 +44,13 @@ class DataVersioner:
     # Registration
     # ------------------------------------------------------------------
 
-    def register_file(self, file_path: str, description: str = "",
-                      parent_version: Optional[str] = None,
-                      metadata: Optional[Dict] = None) -> str:
+    def register_file(
+        self,
+        file_path: str,
+        description: str = "",
+        parent_version: Optional[str] = None,
+        metadata: Optional[Dict] = None,
+    ) -> str:
         """
         Register a data file and compute its version hash.
 
@@ -89,9 +93,13 @@ class DataVersioner:
         logger.info(f"Registered data: {file_path.name} → {checksum[:12]}...")
         return checksum
 
-    def register_array(self, array: np.ndarray, name: str,
-                       description: str = "",
-                       parent_version: Optional[str] = None) -> str:
+    def register_array(
+        self,
+        array: np.ndarray,
+        name: str,
+        description: str = "",
+        parent_version: Optional[str] = None,
+    ) -> str:
         """
         Register an in-memory numpy array (e.g., a train/test split).
         Computes hash over array bytes.
@@ -121,9 +129,12 @@ class DataVersioner:
     # Lineage
     # ------------------------------------------------------------------
 
-    def register_split(self, parent_path: str,
-                       splits: Dict[str, np.ndarray],
-                       split_params: Optional[Dict] = None) -> Dict[str, str]:
+    def register_split(
+        self,
+        parent_path: str,
+        splits: Dict[str, np.ndarray],
+        split_params: Optional[Dict] = None,
+    ) -> Dict[str, str]:
         """
         Register a train/cal/test split with lineage.
 
@@ -146,7 +157,8 @@ class DataVersioner:
         version_map = {}
         for name, arr in splits.items():
             v = self.register_array(
-                arr, name,
+                arr,
+                name,
                 description=f"Split '{name}' from {Path(parent_path).name}",
                 parent_version=parent_hash,
             )
@@ -166,11 +178,13 @@ class DataVersioner:
 
         while current and current in self._manifest:
             entry = self._manifest[current]
-            chain.append({
-                "version": current[:12],
-                "name": entry["file_name"],
-                "description": entry.get("description", ""),
-            })
+            chain.append(
+                {
+                    "version": current[:12],
+                    "name": entry["file_name"],
+                    "description": entry.get("description", ""),
+                }
+            )
             current = entry.get("parent_version")
 
         return chain

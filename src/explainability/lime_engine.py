@@ -35,10 +35,15 @@ class LIMEExplainer:
         Indices of features that should never be perturbed (e.g., ports).
     """
 
-    def __init__(self, model, feature_names: Optional[List[str]] = None,
-                 n_samples: int = 500, kernel_width: float = 0.75,
-                 non_negative_features: Optional[List[int]] = None,
-                 immutable_features: Optional[List[int]] = None):
+    def __init__(
+        self,
+        model,
+        feature_names: Optional[List[str]] = None,
+        n_samples: int = 500,
+        kernel_width: float = 0.75,
+        non_negative_features: Optional[List[int]] = None,
+        immutable_features: Optional[List[int]] = None,
+    ):
         self.model = model
         self.feature_names = feature_names
         self.n_samples = n_samples
@@ -50,8 +55,9 @@ class LIMEExplainer:
     # Core explanation
     # ------------------------------------------------------------------
 
-    def explain_instance(self, x: np.ndarray, top_k: int = 5,
-                         target_class: int = 1) -> Dict[str, Any]:
+    def explain_instance(
+        self, x: np.ndarray, top_k: int = 5, target_class: int = 1
+    ) -> Dict[str, Any]:
         """
         Explain a single prediction using locally weighted linear model.
 
@@ -84,7 +90,7 @@ class LIMEExplainer:
 
         # Compute locality weights via exponential kernel
         distances = np.sqrt(np.sum((perturbed - x) ** 2, axis=1))
-        weights = np.exp(-distances ** 2 / (self.kernel_width ** 2))
+        weights = np.exp(-(distances**2) / (self.kernel_width**2))
 
         # Fit weighted ridge regression (surrogate)
         surrogate = Ridge(alpha=1.0)
@@ -99,22 +105,23 @@ class LIMEExplainer:
         # Top features
         names = self.feature_names or [f"f{i}" for i in range(n_features)]
         coef = surrogate.coef_
-        top = sorted(
-            zip(names, coef.tolist()),
-            key=lambda t: abs(t[1]),
-            reverse=True
-        )[:top_k]
+        top = sorted(zip(names, coef.tolist()), key=lambda t: abs(t[1]), reverse=True)[
+            :top_k
+        ]
 
         return {
             "coefficients": coef,
             "intercept": float(surrogate.intercept_),
             "fidelity": float(fidelity),
             "top_features": top,
-            "prediction": float(self.model.predict_proba(x.reshape(1, -1))[0, target_class]),
+            "prediction": float(
+                self.model.predict_proba(x.reshape(1, -1))[0, target_class]
+            ),
         }
 
-    def explain_batch(self, X: np.ndarray, top_k: int = 5,
-                      target_class: int = 1) -> List[Dict[str, Any]]:
+    def explain_batch(
+        self, X: np.ndarray, top_k: int = 5, target_class: int = 1
+    ) -> List[Dict[str, Any]]:
         """Explain multiple instances."""
         return [self.explain_instance(X[i], top_k, target_class) for i in range(len(X))]
 
@@ -122,8 +129,7 @@ class LIMEExplainer:
     # Domain-aware perturbation
     # ------------------------------------------------------------------
 
-    def _generate_perturbations(self, x: np.ndarray,
-                                n_features: int) -> np.ndarray:
+    def _generate_perturbations(self, x: np.ndarray, n_features: int) -> np.ndarray:
         """
         Generate perturbed samples respecting IDS domain constraints.
 

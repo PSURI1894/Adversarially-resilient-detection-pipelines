@@ -24,9 +24,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ConnectionInfo:
     """Metadata about a connected client."""
+
     client_id: str
     connected_at: float = field(default_factory=time.time)
-    subscriptions: Set[str] = field(default_factory=lambda: {"alerts", "state", "metrics"})
+    subscriptions: Set[str] = field(
+        default_factory=lambda: {"alerts", "state", "metrics"}
+    )
     last_heartbeat: float = field(default_factory=time.time)
 
 
@@ -44,8 +47,9 @@ class WebSocketManager:
         self.heartbeat_interval = heartbeat_interval
         self._message_count = 0
 
-    async def connect(self, websocket, client_id: str,
-                      subscriptions: Optional[Set[str]] = None):
+    async def connect(
+        self, websocket, client_id: str, subscriptions: Optional[Set[str]] = None
+    ):
         """Register a new WebSocket connection."""
         await websocket.accept()
         self._connections[client_id] = websocket
@@ -53,23 +57,26 @@ class WebSocketManager:
             client_id=client_id,
             subscriptions=subscriptions or {"alerts", "state", "metrics"},
         )
-        logger.info(f"Client connected: {client_id} "
-                     f"(total: {len(self._connections)})")
+        logger.info(f"Client connected: {client_id} (total: {len(self._connections)})")
 
         # Send welcome message
-        await self._send_to(client_id, {
-            "type": "connected",
-            "client_id": client_id,
-            "timestamp": time.time(),
-            "subscriptions": list(self._connection_info[client_id].subscriptions),
-        })
+        await self._send_to(
+            client_id,
+            {
+                "type": "connected",
+                "client_id": client_id,
+                "timestamp": time.time(),
+                "subscriptions": list(self._connection_info[client_id].subscriptions),
+            },
+        )
 
     async def disconnect(self, client_id: str):
         """Remove a WebSocket connection."""
         self._connections.pop(client_id, None)
         self._connection_info.pop(client_id, None)
-        logger.info(f"Client disconnected: {client_id} "
-                     f"(remaining: {len(self._connections)})")
+        logger.info(
+            f"Client disconnected: {client_id} (remaining: {len(self._connections)})"
+        )
 
     async def broadcast(self, message: Dict[str, Any], topic: str = "alerts"):
         """
@@ -99,24 +106,33 @@ class WebSocketManager:
 
     async def send_alert(self, alert: Dict[str, Any]):
         """Broadcast an alert event."""
-        await self.broadcast({
-            "type": "alert",
-            "data": alert,
-        }, topic="alerts")
+        await self.broadcast(
+            {
+                "type": "alert",
+                "data": alert,
+            },
+            topic="alerts",
+        )
 
     async def send_state_update(self, state: Dict[str, Any]):
         """Broadcast a SOC state change."""
-        await self.broadcast({
-            "type": "state_update",
-            "data": state,
-        }, topic="state")
+        await self.broadcast(
+            {
+                "type": "state_update",
+                "data": state,
+            },
+            topic="state",
+        )
 
     async def send_metrics(self, metrics: Dict[str, Any]):
         """Broadcast performance metrics."""
-        await self.broadcast({
-            "type": "metrics",
-            "data": metrics,
-        }, topic="metrics")
+        await self.broadcast(
+            {
+                "type": "metrics",
+                "data": metrics,
+            },
+            topic="metrics",
+        )
 
     async def _send_to(self, client_id: str, message: Dict):
         """Send a message to a specific client."""

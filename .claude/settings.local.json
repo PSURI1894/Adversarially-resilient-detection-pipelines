@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(grep -n \"  $\" /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/src/data_infrastructure.py)",
-      "Bash(grep -rn \"  $\" /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/tests/)"
+      "Bash(grep -rn \"  $\" /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/tests/)",
+      "Bash(py -3 -m ruff check src/ tests/)",
+      "Bash(py -3 -m pip install ruff --quiet)",
+      "Bash(py -3 -m ruff format --check src/ tests/)",
+      "Bash(py -3 -m ruff format src/ tests/)"
     ]
   }
 }

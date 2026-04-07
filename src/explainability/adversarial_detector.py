@@ -38,8 +38,9 @@ class AttributionFingerprintDetector:
         Percentile of clean scores to set as the detection threshold.
     """
 
-    def __init__(self, shap_explainer, n_components: int = 3,
-                 threshold_percentile: float = 95.0):
+    def __init__(
+        self, shap_explainer, n_components: int = 3, threshold_percentile: float = 95.0
+    ):
         self.shap_explainer = shap_explainer
         self.n_components = n_components
         self.threshold_percentile = threshold_percentile
@@ -65,7 +66,7 @@ class AttributionFingerprintDetector:
             n_components=self.n_components,
             covariance_type="full",
             random_state=42,
-            max_iter=200
+            max_iter=200,
         )
         self.gmm.fit(attributions)
 
@@ -129,8 +130,7 @@ class FeatureSensitivityAnalyzer:
         self.model = model
         self.feature_names = feature_names
 
-    def compute_sensitivity(self, X: np.ndarray,
-                            delta: float = 1e-4) -> np.ndarray:
+    def compute_sensitivity(self, X: np.ndarray, delta: float = 1e-4) -> np.ndarray:
         """
         Compute per-feature sensitivity via finite differences.
 

@@ -43,11 +43,14 @@ class AdaptiveRetrainingPipeline:
         Maximum number of samples to use for retraining.
     """
 
-    def __init__(self, ensemble_orchestrator,
-                 validation_gate: float = 0.02,
-                 active_learning_strategy: str = "uncertainty",
-                 uncertainty_percentile: float = 70.0,
-                 max_retrain_samples: Optional[int] = None):
+    def __init__(
+        self,
+        ensemble_orchestrator,
+        validation_gate: float = 0.02,
+        active_learning_strategy: str = "uncertainty",
+        uncertainty_percentile: float = 70.0,
+        max_retrain_samples: Optional[int] = None,
+    ):
         self.orchestrator = ensemble_orchestrator
         self.validation_gate = validation_gate
         self.strategy = active_learning_strategy
@@ -55,11 +58,14 @@ class AdaptiveRetrainingPipeline:
         self.max_retrain_samples = max_retrain_samples
         self.history: List[Dict[str, Any]] = []
 
-    def retrain(self, current_model,
-                X_train_new: np.ndarray,
-                y_train_new: np.ndarray,
-                X_holdout: np.ndarray,
-                y_holdout: np.ndarray):
+    def retrain(
+        self,
+        current_model,
+        X_train_new: np.ndarray,
+        y_train_new: np.ndarray,
+        X_holdout: np.ndarray,
+        y_holdout: np.ndarray,
+    ):
         """
         Retrain the model on new data with validation gate.
 
@@ -75,11 +81,11 @@ class AdaptiveRetrainingPipeline:
         logger.info("Adaptive retraining triggered...")
 
         # 1. Active Learning (Sample Selection)
-        X_al, y_al = self._select_samples(
-            current_model, X_train_new, y_train_new
+        X_al, y_al = self._select_samples(current_model, X_train_new, y_train_new)
+        logger.info(
+            f"Active learning selected {len(X_al)}/{len(X_train_new)} samples "
+            f"(strategy={self.strategy})"
         )
-        logger.info(f"Active learning selected {len(X_al)}/{len(X_train_new)} samples "
-                     f"(strategy={self.strategy})")
 
         # 2. Evaluate baseline performance
         f1_old = self._evaluate_f1(current_model, X_holdout, y_holdout)
@@ -107,12 +113,16 @@ class AdaptiveRetrainingPipeline:
 
         # 6. Gate decision
         if gain >= self.validation_gate:
-            logger.info(f"Retraining promoted: F1 {f1_old:.4f} → {f1_new:.4f} "
-                         f"(+{gain:.4f} ≥ gate {self.validation_gate})")
+            logger.info(
+                f"Retraining promoted: F1 {f1_old:.4f} → {f1_new:.4f} "
+                f"(+{gain:.4f} ≥ gate {self.validation_gate})"
+            )
             return self.orchestrator
         else:
-            logger.warning(f"Retraining rolled back: F1 gain {gain:.4f} "
-                            f"< gate {self.validation_gate}")
+            logger.warning(
+                f"Retraining rolled back: F1 gain {gain:.4f} "
+                f"< gate {self.validation_gate}"
+            )
             return current_model
 
     def _select_samples(self, model, X: np.ndarray, y: np.ndarray):
@@ -145,7 +155,9 @@ class AdaptiveRetrainingPipeline:
             X_sel, y_sel = X[mask], y[mask]
 
             if self.max_retrain_samples and len(X_sel) > self.max_retrain_samples:
-                idx = np.random.choice(len(X_sel), self.max_retrain_samples, replace=False)
+                idx = np.random.choice(
+                    len(X_sel), self.max_retrain_samples, replace=False
+                )
                 return X_sel[idx], y_sel[idx]
 
             return X_sel, y_sel

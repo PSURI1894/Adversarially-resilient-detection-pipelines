@@ -36,8 +36,9 @@ class RobustCalibration:
         Fraction to trim from each side when using trimmed_mean.
     """
 
-    def __init__(self, alpha=0.05, n_partitions=7, aggregation="median",
-                 trim_fraction=0.2):
+    def __init__(
+        self, alpha=0.05, n_partitions=7, aggregation="median", trim_fraction=0.2
+    ):
         self.alpha = alpha
         self.n_partitions = n_partitions
         self.aggregation = aggregation

@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 # PROTOCOL — any model that exposes predict_proba & a TF subnet
 # ═══════════════════════════════════════════════════════════════
 
+
 @runtime_checkable
 class DifferentiableModel(Protocol):
     """Anything that can yield gradients w.r.t. inputs."""
@@ -31,11 +32,13 @@ class DifferentiableModel(Protocol):
 # BASE CLASS
 # ═══════════════════════════════════════════════════════════════
 
+
 @dataclass
 class AttackConfig:
     """Type-safe attack parameterization."""
+
     epsilon: float = 0.1
-    norm: str = "l_inf"           # "l_inf" | "l_2"
+    norm: str = "l_inf"  # "l_inf" | "l_2"
     max_iter: int = 20
     step_size: float | None = None  # defaults to eps / max_iter * 2.5
     targeted: bool = False
@@ -55,9 +58,7 @@ class BaseAttack(ABC):
             self.config.step_size = self.config.epsilon / self.config.max_iter * 2.5
 
     @abstractmethod
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         """Return adversarial version of X."""
         ...
 
@@ -71,13 +72,9 @@ class BaseAttack(ABC):
             norms = np.linalg.norm(delta, axis=1, keepdims=True) + 1e-12
             scale = np.minimum(1.0, self.config.epsilon / norms)
             delta = delta * scale
-        return np.clip(
-            X_orig + delta, self.config.clip_min, self.config.clip_max
-        )
+        return np.clip(X_orig + delta, self.config.clip_min, self.config.clip_max)
 
-    def _apply_feature_mask(
-        self, X_adv: np.ndarray, X_orig: np.ndarray
-    ) -> np.ndarray:
+    def _apply_feature_mask(self, X_adv: np.ndarray, X_orig: np.ndarray) -> np.ndarray:
         """Zero-out perturbations on immutable features."""
         if not self.config.mutable_features:
             return X_adv
@@ -92,6 +89,7 @@ class BaseAttack(ABC):
 # PGD (PROJECTED GRADIENT DESCENT) — Madry et al. 2018
 # ═══════════════════════════════════════════════════════════════
 
+
 class PGDAttack(BaseAttack):
     """
     Projected Gradient Descent with ℓ∞ or ℓ₂ constraint.
@@ -100,9 +98,7 @@ class PGDAttack(BaseAttack):
     Iterates:  x_{t+1} = Π_ε( x_t + α · sign(∇_x L(x_t, y)) )
     """
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         cfg = self.config
         X_adv = X.copy()
 
@@ -161,6 +157,7 @@ class PGDAttack(BaseAttack):
 # C&W L2 — Carlini & Wagner 2017
 # ═══════════════════════════════════════════════════════════════
 
+
 class CarliniWagnerL2(BaseAttack):
     """
     Carlini-Wagner L2 attack.
@@ -187,22 +184,18 @@ class CarliniWagnerL2(BaseAttack):
         self.lr = learning_rate
         self.confidence = confidence
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         best_adv = X.copy()
         batch = X.shape[0]
 
         for i in range(batch):
-            x_i = X[i: i + 1]
+            x_i = X[i : i + 1]
             y_i = y[i]
             best_adv[i] = self._attack_single(model, x_i, y_i)
 
         return best_adv.astype(np.float32)
 
-    def _attack_single(
-        self, model, x: np.ndarray, y_true: int
-    ) -> np.ndarray:
+    def _attack_single(self, model, x: np.ndarray, y_true: int) -> np.ndarray:
         cfg = self.config
         best_l2 = float("inf")
         best_adv = x.copy()
@@ -227,9 +220,7 @@ class CarliniWagnerL2(BaseAttack):
                     # Margin loss
                     target_prob = probs[0, y_true]
                     other_prob = probs[0, 1 - y_true]
-                    margin = tf.maximum(
-                        target_prob - other_prob + self.confidence, 0.0
-                    )
+                    margin = tf.maximum(target_prob - other_prob + self.confidence, 0.0)
 
                     total_loss = l2_dist + c * margin
 
@@ -237,13 +228,15 @@ class CarliniWagnerL2(BaseAttack):
                 opt.apply_gradients(zip(grad, [w]))
 
             # Check result
-            x_adv_np = ((np.tanh(w.numpy()) + 1.0) / 2.0)
+            x_adv_np = (np.tanh(w.numpy()) + 1.0) / 2.0
             pred = model.predict_proba(x_adv_np)
             pred_class = int(pred[0, 1] > 0.5)
             l2 = float(np.sqrt(np.sum((x_adv_np - x) ** 2)))
 
             attack_success = (
-                pred_class != y_true if not cfg.targeted else pred_class == cfg.target_class
+                pred_class != y_true
+                if not cfg.targeted
+                else pred_class == cfg.target_class
             )
 
             if attack_success and l2 < best_l2:
@@ -274,6 +267,7 @@ class CarliniWagnerL2(BaseAttack):
 # AUTOATTACK — Croce & Hein 2020
 # ═══════════════════════════════════════════════════════════════
 
+
 class AutoAttack(BaseAttack):
     """
     AutoAttack: ensemble of complementary attacks.
@@ -288,35 +282,37 @@ class AutoAttack(BaseAttack):
     suitable for tabular IDS evaluation.
     """
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         best_adv = X.copy()
         best_success = np.zeros(len(X), dtype=bool)
 
         # ── Sub-attack 1: APGD-CE ──────────────────────────────
-        apgd_ce = PGDAttack(AttackConfig(
-            epsilon=self.config.epsilon,
-            norm=self.config.norm,
-            max_iter=self.config.max_iter * 2,
-            mutable_features=self.config.mutable_features,
-            clip_min=self.config.clip_min,
-            clip_max=self.config.clip_max,
-        ))
+        apgd_ce = PGDAttack(
+            AttackConfig(
+                epsilon=self.config.epsilon,
+                norm=self.config.norm,
+                max_iter=self.config.max_iter * 2,
+                mutable_features=self.config.mutable_features,
+                clip_min=self.config.clip_min,
+                clip_max=self.config.clip_max,
+            )
+        )
         adv_ce = apgd_ce.generate(model, X, y)
         self._update_best(model, X, y, adv_ce, best_adv, best_success)
 
         # ── Sub-attack 2: APGD with step-size schedule ─────────
-        apgd_dlr = PGDAttack(AttackConfig(
-            epsilon=self.config.epsilon,
-            norm=self.config.norm,
-            max_iter=self.config.max_iter * 2,
-            step_size=self.config.epsilon / 4,  # smaller steps
-            random_start=True,
-            mutable_features=self.config.mutable_features,
-            clip_min=self.config.clip_min,
-            clip_max=self.config.clip_max,
-        ))
+        apgd_dlr = PGDAttack(
+            AttackConfig(
+                epsilon=self.config.epsilon,
+                norm=self.config.norm,
+                max_iter=self.config.max_iter * 2,
+                step_size=self.config.epsilon / 4,  # smaller steps
+                random_start=True,
+                mutable_features=self.config.mutable_features,
+                clip_min=self.config.clip_min,
+                clip_max=self.config.clip_max,
+            )
+        )
         adv_dlr = apgd_dlr.generate(model, X, y)
         self._update_best(model, X, y, adv_dlr, best_adv, best_success)
 
@@ -356,22 +352,16 @@ class AutoAttack(BaseAttack):
         for _ in range(n_queries):
             # Random perturbation within ε-ball
             if cfg.norm == "l_inf":
-                noise = np.random.uniform(
-                    -cfg.epsilon, cfg.epsilon, size=X.shape
-                )
+                noise = np.random.uniform(-cfg.epsilon, cfg.epsilon, size=X.shape)
             else:
                 noise = np.random.randn(*X.shape)
-                noise = noise / (
-                    np.linalg.norm(noise, axis=1, keepdims=True) + 1e-12
-                )
+                noise = noise / (np.linalg.norm(noise, axis=1, keepdims=True) + 1e-12)
                 noise *= cfg.epsilon * np.random.rand(len(X), 1)
 
             X_cand = np.clip(X + noise, cfg.clip_min, cfg.clip_max)
             X_cand = self._apply_feature_mask(X_cand, X)
 
-            preds_cand = (
-                model.predict_proba(X_cand)[:, 1] > 0.5
-            ).astype(int)
+            preds_cand = (model.predict_proba(X_cand)[:, 1] > 0.5).astype(int)
             improved = (preds_cand != y) & (~success)
             best_adv[improved] = X_cand[improved]
             success[improved] = True

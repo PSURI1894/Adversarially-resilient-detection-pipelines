@@ -5,11 +5,13 @@ DATA POISONING ATTACKS
 Attacks that corrupt training / calibration data.
 ================================================================================
 """
+
 from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Tuple
 from abc import ABC, abstractmethod
+
 
 @dataclass
 class PoisonConfig:
@@ -18,6 +20,7 @@ class PoisonConfig:
     target_class: int = 0
     trigger_value: float = 999.0
     trigger_features: List[int] = field(default_factory=list)
+
 
 class BasePoisoning(ABC):
     def __init__(self, config: PoisonConfig | None = None):
@@ -31,8 +34,10 @@ class BasePoisoning(ABC):
         k = int(n * self.config.fraction)
         return self.rng.choice(n, size=k, replace=False)
 
+
 class LabelFlipPoisoning(BasePoisoning):
     """Random / targeted / boundary-proximate label flipping."""
+
     def __init__(self, config=None, *, mode: str = "random"):
         super().__init__(config)
         self.mode = mode
@@ -60,8 +65,10 @@ class LabelFlipPoisoning(BasePoisoning):
             y_o[idx] = 1 - y_o[idx]
         return X_o, y_o
 
+
 class BackdoorPoisoning(BasePoisoning):
     """Injects trigger pattern + forces target label."""
+
     def poison(self, X, y):
         X_o, y_o = X.copy(), y.copy()
         idx = self._select_indices(len(y))
@@ -80,8 +87,10 @@ class BackdoorPoisoning(BasePoisoning):
                 X_t[:, f] = self.config.trigger_value
         return X_t
 
+
 class CleanLabelPoisoning(BasePoisoning):
     """Moves target-class features towards source centroid without label change."""
+
     def __init__(self, config=None, *, perturbation_strength: float = 0.5):
         super().__init__(config)
         self.strength = perturbation_strength
@@ -101,8 +110,10 @@ class CleanLabelPoisoning(BasePoisoning):
             X_o[i] += self.strength * (centroid - X_o[i])
         return X_o, y_o
 
+
 class CalibrationPoisoning(BasePoisoning):
     """Targets conformal prediction calibration (inflate/deflate q_hat)."""
+
     def __init__(self, config=None, *, mode: str = "inflate", score_delta: float = 0.3):
         super().__init__(config)
         self.mode = mode

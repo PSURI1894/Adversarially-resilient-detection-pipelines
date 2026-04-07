@@ -42,8 +42,9 @@ class RandomizedSmoothedCP:
         PTT function: 'rank' uses rank-based transform, 'sigmoid' uses sigmoid.
     """
 
-    def __init__(self, alpha=0.05, sigma=0.1, n_samples=100,
-                 ptt=True, ptt_transform="rank"):
+    def __init__(
+        self, alpha=0.05, sigma=0.1, n_samples=100, ptt=True, ptt_transform="rank"
+    ):
         self.alpha = alpha
         self.sigma = sigma
         self.n_samples = n_samples
@@ -99,9 +100,7 @@ class RandomizedSmoothedCP:
         if self.ptt_transform == "rank":
             # Rank-based: map score to its empirical CDF value among cal scores
             # This is a monotone transform → preserves conformal validity
-            return np.array([
-                np.mean(self.cal_scores_ <= s) for s in scores
-            ])
+            return np.array([np.mean(self.cal_scores_ <= s) for s in scores])
         elif self.ptt_transform == "sigmoid":
             # Sigmoid centering around calibration median
             median = np.median(self.cal_scores_)
@@ -190,6 +189,7 @@ class RandomizedSmoothedCP:
 # Robust Conformal Training (RCT) Loss
 # ======================================================================
 
+
 def rct_loss(model, X_batch, y_batch, sigma=0.1, n_mc=10, alpha=0.05):
     """
     Differentiable surrogate loss for Robust Conformal Training.
@@ -231,7 +231,7 @@ def rct_loss(model, X_batch, y_batch, sigma=0.1, n_mc=10, alpha=0.05):
         # Non-conformity: 1 - P(y_true | x+ε)
         y_tf = tf.cast(y_batch, tf.float32)
         true_probs = y_tf * probs + (1 - y_tf) * (1 - probs)
-        score_sum += (1.0 - true_probs)
+        score_sum += 1.0 - true_probs
 
     mean_scores = score_sum / n_mc
     # Penalize large scores (want them small so sets are tight)

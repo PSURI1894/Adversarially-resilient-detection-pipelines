@@ -32,9 +32,13 @@ class SHAPExplainer:
         Human-readable feature names for reports.
     """
 
-    def __init__(self, model, mode: str = "kernel",
-                 background_data: Optional[np.ndarray] = None,
-                 feature_names: Optional[List[str]] = None):
+    def __init__(
+        self,
+        model,
+        mode: str = "kernel",
+        background_data: Optional[np.ndarray] = None,
+        feature_names: Optional[List[str]] = None,
+    ):
         self.model = model
         self.mode = mode
         self.background_data = background_data
@@ -49,12 +53,11 @@ class SHAPExplainer:
 
         try:
             import shap
+
             if self.mode == "tree":
                 self._explainer = shap.TreeExplainer(self.model)
             elif self.mode == "deep":
-                self._explainer = shap.DeepExplainer(
-                    self.model, self.background_data
-                )
+                self._explainer = shap.DeepExplainer(self.model, self.background_data)
             elif self.mode == "kernel":
                 self._explainer = shap.KernelExplainer(
                     self.model.predict_proba, self.background_data
@@ -103,9 +106,7 @@ class SHAPExplainer:
 
         names = self.feature_names or [f"f{i}" for i in range(len(shap_vals))]
         top = sorted(
-            zip(names, shap_vals.tolist()),
-            key=lambda t: abs(t[1]),
-            reverse=True
+            zip(names, shap_vals.tolist()), key=lambda t: abs(t[1]), reverse=True
         )
 
         return {
@@ -140,11 +141,9 @@ class SHAPExplainer:
         vals = self.explain_batch(X)
         mean_abs = np.mean(np.abs(vals), axis=0)
         names = self.feature_names or [f"f{i}" for i in range(vals.shape[1])]
-        importance = dict(sorted(
-            zip(names, mean_abs.tolist()),
-            key=lambda t: t[1],
-            reverse=True
-        ))
+        importance = dict(
+            sorted(zip(names, mean_abs.tolist()), key=lambda t: t[1], reverse=True)
+        )
         return importance
 
     # ------------------------------------------------------------------
@@ -157,7 +156,7 @@ class SHAPExplainer:
         return self._explainer.shap_values(X)
 
     def _get_base_value(self):
-        if hasattr(self._explainer, 'expected_value'):
+        if hasattr(self._explainer, "expected_value"):
             ev = self._explainer.expected_value
             if isinstance(ev, (list, np.ndarray)):
                 return float(ev[1]) if len(ev) > 1 else float(ev[0])
@@ -174,7 +173,9 @@ class _PermutationSHAP:
     def __init__(self, model, background, n_samples=50):
         self.model = model
         self.background = background
-        self.n_samples = min(n_samples, len(background)) if background is not None else 50
+        self.n_samples = (
+            min(n_samples, len(background)) if background is not None else 50
+        )
         self.expected_value = None
 
     def shap_values(self, X):
@@ -184,7 +185,7 @@ class _PermutationSHAP:
         if self.background is None:
             return np.zeros((n_points, n_features))
 
-        bg = self.background[:self.n_samples]
+        bg = self.background[: self.n_samples]
         base_preds = self.model.predict_proba(bg)[:, 1]
         self.expected_value = [float(1 - base_preds.mean()), float(base_preds.mean())]
 

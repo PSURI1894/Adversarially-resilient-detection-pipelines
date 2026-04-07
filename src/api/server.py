@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # REQUEST / RESPONSE MODELS
 # ==============================================================================
 
+
 class SimulateRequest(BaseModel):
     attack_type: str = "pgd"
     epsilon: float = 0.1
@@ -66,6 +67,7 @@ class StatusResponse(BaseModel):
 # ==============================================================================
 # IN-MEMORY STORES (populated by pipeline at runtime)
 # ==============================================================================
+
 
 class PipelineState:
     """Shared state between the pipeline and the API layer."""
@@ -106,7 +108,9 @@ class PipelineState:
         self.soc_state = diagnostics.get("state", self.soc_state)
         self.severity = diagnostics.get("severity", self.severity)
         self.alert_debt = diagnostics.get("alert_debt", self.alert_debt)
-        self.calibration_drift = diagnostics.get("calibration_drift", self.calibration_drift)
+        self.calibration_drift = diagnostics.get(
+            "calibration_drift", self.calibration_drift
+        )
         self.disagreement = diagnostics.get("disagreement", self.disagreement)
         self.n_evaluations = diagnostics.get("n_evaluations", self.n_evaluations)
 
@@ -114,6 +118,7 @@ class PipelineState:
 # ==============================================================================
 # APP FACTORY
 # ==============================================================================
+
 
 def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
     """
@@ -174,7 +179,7 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             alerts = [a for a in alerts if a.get("uncertainty") == severity]
 
         total = len(alerts)
-        page = alerts[offset:offset + limit]
+        page = alerts[offset : offset + limit]
 
         return {
             "total": total,
@@ -247,15 +252,18 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         sim_id = uuid.uuid4().hex[:8]
 
         # Notify connected clients
-        await ws_manager.broadcast({
-            "type": "simulation_started",
-            "data": {
-                "sim_id": sim_id,
-                "attack_type": request.attack_type,
-                "epsilon": request.epsilon,
-                "n_samples": request.n_samples,
+        await ws_manager.broadcast(
+            {
+                "type": "simulation_started",
+                "data": {
+                    "sim_id": sim_id,
+                    "attack_type": request.attack_type,
+                    "epsilon": request.epsilon,
+                    "n_samples": request.n_samples,
+                },
             },
-        }, topic="state")
+            topic="state",
+        )
 
         return {
             "sim_id": sim_id,
@@ -302,5 +310,6 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
 if __name__ == "__main__":
     import uvicorn
+
     app = create_app()
     uvicorn.run(app, host="0.0.0.0", port=8000)

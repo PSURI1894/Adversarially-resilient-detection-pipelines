@@ -14,9 +14,9 @@ __all__ = [
     "TabTransformer",
     "VAIDS",
     "DeepEnsemble",
-    "PGDTrainer", 
-    "TRADESTrainer", 
+    "PGDTrainer",
+    "TRADESTrainer",
     "FreeAdversarialTrainer",
-    "TemperatureScaling", 
-    "IsotonicCalibration"
+    "TemperatureScaling",
+    "IsotonicCalibration",
 ]

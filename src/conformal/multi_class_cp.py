@@ -69,10 +69,14 @@ class AdaptiveConformalPredictor:
         sorted_probs, sorted_indices = self._sort_probs(probs)
         cumsum_probs = np.cumsum(sorted_probs, axis=1)
 
-        scores = np.array([
-            self._conformity_score(probs[i], sorted_indices[i], cumsum_probs[i], y_cal[i])
-            for i in range(len(y_cal))
-        ])
+        scores = np.array(
+            [
+                self._conformity_score(
+                    probs[i], sorted_indices[i], cumsum_probs[i], y_cal[i]
+                )
+                for i in range(len(y_cal))
+            ]
+        )
 
         n = len(y_cal)
         q_level = min(np.ceil((n + 1) * (1 - self.alpha)) / n, 1.0)

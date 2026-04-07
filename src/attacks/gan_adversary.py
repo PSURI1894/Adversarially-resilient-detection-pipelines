@@ -6,11 +6,13 @@ Generator produces adversarial flow records that fool the detector.
 Discriminator doubles as a secondary anomaly detector.
 ================================================================================
 """
+
 from __future__ import annotations
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 from typing import Optional, List
+
 
 class AdversarialGAN:
     """WGAN-GP for generating adversarial network traffic."""
@@ -88,9 +90,11 @@ class AdversarialGAN:
         return d_loss, g_loss
 
     def fit(self, X_real: np.ndarray, epochs: int = 50, batch_size: int = 256):
-        dataset = tf.data.Dataset.from_tensor_slices(
-            X_real.astype(np.float32)
-        ).shuffle(10_000).batch(batch_size)
+        dataset = (
+            tf.data.Dataset.from_tensor_slices(X_real.astype(np.float32))
+            .shuffle(10_000)
+            .batch(batch_size)
+        )
         self.history = {"d_loss": [], "g_loss": []}
         for ep in range(epochs):
             for batch in dataset:
@@ -98,8 +102,13 @@ class AdversarialGAN:
             self.history["d_loss"].append(float(d_l))
             self.history["g_loss"].append(float(g_l))
 
-    def generate(self, model=None, X: np.ndarray = None, y: np.ndarray = None,
-                 n_samples: int = 1000) -> np.ndarray:
+    def generate(
+        self,
+        model=None,
+        X: np.ndarray = None,
+        y: np.ndarray = None,
+        n_samples: int = 1000,
+    ) -> np.ndarray:
         z = np.random.randn(n_samples, self.latent_dim).astype(np.float32)
         return self.generator.predict(z, verbose=0)
 

@@ -40,9 +40,7 @@ class SlidingWindowAggregator:
     def __init__(self, window_sizes: List[float] = None, n_features: int = 10):
         self.window_sizes = window_sizes or [60.0, 300.0, 900.0]
         self.n_features = n_features
-        self._buffers: Dict[float, deque] = {
-            w: deque() for w in self.window_sizes
-        }
+        self._buffers: Dict[float, deque] = {w: deque() for w in self.window_sizes}
         # Each window produces: mean(n_features) + std(n_features) + count(1)
         self._agg_dim_per_window = n_features * 2 + 1
         self._total_agg_dim = self._agg_dim_per_window * len(self.window_sizes)
@@ -73,8 +71,8 @@ class SlidingWindowAggregator:
 
             data = np.array([f for _, f in buf], dtype=np.float32)
             n_feat = self.n_features
-            agg[offset:offset + n_feat] = np.mean(data, axis=0)
-            agg[offset + n_feat:offset + 2 * n_feat] = np.std(data, axis=0)
+            agg[offset : offset + n_feat] = np.mean(data, axis=0)
+            agg[offset + n_feat : offset + 2 * n_feat] = np.std(data, axis=0)
             agg[offset + 2 * n_feat] = float(len(data))
             offset += self._agg_dim_per_window
 
@@ -102,12 +100,15 @@ class FlowConsumer:
         Sliding window sizes for temporal aggregation.
     """
 
-    def __init__(self, input_topic: str = "raw-traffic",
-                 output_topic: str = "enriched-features",
-                 bootstrap_servers: Optional[str] = None,
-                 group_id: str = "ids-consumer-group",
-                 feature_transform: Optional[Callable] = None,
-                 window_sizes: Optional[List[float]] = None):
+    def __init__(
+        self,
+        input_topic: str = "raw-traffic",
+        output_topic: str = "enriched-features",
+        bootstrap_servers: Optional[str] = None,
+        group_id: str = "ids-consumer-group",
+        feature_transform: Optional[Callable] = None,
+        window_sizes: Optional[List[float]] = None,
+    ):
         self.input_topic = input_topic
         self.output_topic = output_topic
         self.group_id = group_id
@@ -121,6 +122,7 @@ class FlowConsumer:
         if bootstrap_servers:
             try:
                 from kafka import KafkaConsumer, KafkaProducer
+
                 self._consumer = KafkaConsumer(
                     input_topic,
                     bootstrap_servers=bootstrap_servers,
@@ -138,6 +140,7 @@ class FlowConsumer:
 
         if not self._use_kafka:
             from src.streaming.kafka_producer import _InMemoryBus
+
             self._input_bus = _InMemoryBus.get_topic(self.input_topic)
             self._output_bus = _InMemoryBus.get_topic(self.output_topic)
 

@@ -32,6 +32,7 @@ _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 # CORRELATION ID
 # ==============================================================================
 
+
 def get_correlation_id() -> str:
     """Get the current correlation ID, generating one if absent."""
     cid = _correlation_id.get()
@@ -49,6 +50,7 @@ def set_correlation_id(cid: str):
 # ==============================================================================
 # JSON LOG FORMATTER
 # ==============================================================================
+
 
 class JSONFormatter(logging.Formatter):
     """Structured JSON log formatter for machine-parseable log output."""
@@ -77,6 +79,7 @@ class JSONFormatter(logging.Formatter):
 # LOGGING
 # ==============================================================================
 
+
 def get_logger(name: str, json_logs: bool = False) -> logging.Logger:
     """
     Configures a professional multi-handler logger.
@@ -98,11 +101,11 @@ def get_logger(name: str, json_logs: bool = False) -> logging.Logger:
 
     # Human-readable formatter for console
     console_fmt = logging.Formatter(
-        '%(asctime)s | %(name)s | %(levelname)s | %(message)s'
+        "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
     )
 
     # Ensure log directory exists
-    log_dir = PROJECT_ROOT / 'reports' / 'audit_logs'
+    log_dir = PROJECT_ROOT / "reports" / "audit_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # Console handler
@@ -111,7 +114,7 @@ def get_logger(name: str, json_logs: bool = False) -> logging.Logger:
     logger.addHandler(sh)
 
     # File handler (optionally JSON-formatted)
-    log_path = log_dir / 'system.log'
+    log_path = log_dir / "system.log"
     fh = logging.FileHandler(log_path)
     if json_logs:
         fh.setFormatter(JSONFormatter())
@@ -126,6 +129,7 @@ def get_logger(name: str, json_logs: bool = False) -> logging.Logger:
 # TIMING DECORATORS
 # ==============================================================================
 
+
 def timed(logger_name: Optional[str] = None):
     """
     Decorator that logs execution time of a function.
@@ -137,6 +141,7 @@ def timed(logger_name: Optional[str] = None):
 
     Logs: "train_model completed in 1234.5ms"
     """
+
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -151,7 +156,9 @@ def timed(logger_name: Optional[str] = None):
                 elapsed_ms = (time.perf_counter() - t0) * 1000
                 log.error(f"{func.__name__} failed after {elapsed_ms:.1f}ms: {e}")
                 raise
+
         return wrapper
+
     return decorator
 
 
@@ -163,6 +170,7 @@ def timed_stage(stage_name: str, logger_name: str = "Pipeline"):
         with timed_stage("conformal_calibration"):
             conformal.calibrate(model, X_cal, y_cal)
     """
+
     class _Timer:
         def __init__(self):
             self.elapsed_ms = 0.0
@@ -192,22 +200,23 @@ def timed_stage(stage_name: str, logger_name: str = "Pipeline"):
 # DIRECTORY MANAGEMENT
 # ==============================================================================
 
+
 def ensure_directories():
     """
     Builds the folder architecture automatically.
     Safe to call multiple times.
     """
     dirs = [
-        PROJECT_ROOT / 'data' / 'raw',
-        PROJECT_ROOT / 'data' / 'processed',
-        PROJECT_ROOT / 'reports' / 'figures',
-        PROJECT_ROOT / 'reports' / 'audit_logs',
-        PROJECT_ROOT / 'reports' / 'experiments',
-        PROJECT_ROOT / 'reports' / 'dashboards',
-        PROJECT_ROOT / 'tests',
-        PROJECT_ROOT / 'models',
-        PROJECT_ROOT / 'models' / 'registry',
-        PROJECT_ROOT / 'configs',
+        PROJECT_ROOT / "data" / "raw",
+        PROJECT_ROOT / "data" / "processed",
+        PROJECT_ROOT / "reports" / "figures",
+        PROJECT_ROOT / "reports" / "audit_logs",
+        PROJECT_ROOT / "reports" / "experiments",
+        PROJECT_ROOT / "reports" / "dashboards",
+        PROJECT_ROOT / "tests",
+        PROJECT_ROOT / "models",
+        PROJECT_ROOT / "models" / "registry",
+        PROJECT_ROOT / "configs",
     ]
 
     for d in dirs:

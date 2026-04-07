@@ -31,8 +31,11 @@ class IncidentReporter:
         Human-readable feature names.
     """
 
-    def __init__(self, output_dir: str = "reports/incidents",
-                 feature_names: Optional[List[str]] = None):
+    def __init__(
+        self,
+        output_dir: str = "reports/incidents",
+        feature_names: Optional[List[str]] = None,
+    ):
         self.output_dir = output_dir
         self.feature_names = feature_names
         os.makedirs(output_dir, exist_ok=True)
@@ -41,13 +44,17 @@ class IncidentReporter:
     # Single incident report
     # ------------------------------------------------------------------
 
-    def generate_report(self, sample: np.ndarray, prediction: float,
-                        prediction_set: List[int],
-                        shap_explanation: Optional[Dict] = None,
-                        lime_explanation: Optional[Dict] = None,
-                        risk_score: float = 0.0,
-                        soc_state: str = "STABLE",
-                        alert_id: Optional[str] = None) -> Dict[str, Any]:
+    def generate_report(
+        self,
+        sample: np.ndarray,
+        prediction: float,
+        prediction_set: List[int],
+        shap_explanation: Optional[Dict] = None,
+        lime_explanation: Optional[Dict] = None,
+        risk_score: float = 0.0,
+        soc_state: str = "STABLE",
+        alert_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Generate a structured incident report.
 
@@ -55,10 +62,13 @@ class IncidentReporter:
         -------
         dict: The complete report as a structured dictionary.
         """
-        alert_id = alert_id or f"ALERT-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        alert_id = (
+            alert_id or f"ALERT-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        )
 
-        severity = self._compute_severity(prediction, len(prediction_set),
-                                          risk_score, soc_state)
+        severity = self._compute_severity(
+            prediction, len(prediction_set), risk_score, soc_state
+        )
         priority = self._severity_to_priority(severity)
 
         report = {
@@ -77,12 +87,20 @@ class IncidentReporter:
                 "soc_state": soc_state,
             },
             "explanations": {
-                "shap": self._format_shap(shap_explanation) if shap_explanation else None,
-                "lime": self._format_lime(lime_explanation) if lime_explanation else None,
+                "shap": self._format_shap(shap_explanation)
+                if shap_explanation
+                else None,
+                "lime": self._format_lime(lime_explanation)
+                if lime_explanation
+                else None,
             },
             "recommendations": self._generate_recommendations(
-                prediction, prediction_set, risk_score, soc_state,
-                shap_explanation, lime_explanation
+                prediction,
+                prediction_set,
+                risk_score,
+                soc_state,
+                shap_explanation,
+                lime_explanation,
             ),
             "sample_features": self._format_sample(sample),
         }
@@ -93,10 +111,13 @@ class IncidentReporter:
     # Batch reporting
     # ------------------------------------------------------------------
 
-    def generate_batch_reports(self, X: np.ndarray, predictions: np.ndarray,
-                               prediction_sets: List[List[int]],
-                               risk_scores: Optional[np.ndarray] = None
-                               ) -> List[Dict[str, Any]]:
+    def generate_batch_reports(
+        self,
+        X: np.ndarray,
+        predictions: np.ndarray,
+        prediction_sets: List[List[int]],
+        risk_scores: Optional[np.ndarray] = None,
+    ) -> List[Dict[str, Any]]:
         """Generate reports for an entire batch."""
         reports = []
         for i in range(len(X)):
@@ -113,8 +134,9 @@ class IncidentReporter:
     # Export
     # ------------------------------------------------------------------
 
-    def export_json(self, report: Dict[str, Any],
-                    filename: Optional[str] = None) -> str:
+    def export_json(
+        self, report: Dict[str, Any], filename: Optional[str] = None
+    ) -> str:
         """Export a single report to JSON file."""
         filename = filename or f"{report['alert_id']}.json"
         path = os.path.join(self.output_dir, filename)
@@ -122,8 +144,9 @@ class IncidentReporter:
             json.dump(report, f, indent=2, default=str)
         return path
 
-    def export_html(self, report: Dict[str, Any],
-                    filename: Optional[str] = None) -> str:
+    def export_html(
+        self, report: Dict[str, Any], filename: Optional[str] = None
+    ) -> str:
         """Export a single report as an HTML page."""
         filename = filename or f"{report['alert_id']}.html"
         path = os.path.join(self.output_dir, filename)
@@ -133,11 +156,14 @@ class IncidentReporter:
             f.write(html)
         return path
 
-    def export_csv_summary(self, reports: List[Dict[str, Any]],
-                           filename: str = "summary.csv") -> str:
+    def export_csv_summary(
+        self, reports: List[Dict[str, Any]], filename: str = "summary.csv"
+    ) -> str:
         """Export batch summary to CSV."""
         path = os.path.join(self.output_dir, filename)
-        lines = ["alert_id,timestamp,severity,priority,prediction,uncertainty,risk_score,soc_state"]
+        lines = [
+            "alert_id,timestamp,severity,priority,prediction,uncertainty,risk_score,soc_state"
+        ]
         for r in reports:
             lines.append(
                 f"{r['alert_id']},{r['timestamp']},{r['severity']},{r['priority']},"
@@ -158,8 +184,12 @@ class IncidentReporter:
         pred_component = prediction * 40
         uncertainty_component = (set_size - 1) * 20
         risk_component = risk_score * 0.3
-        state_bonus = {"FAILURE": 20, "EVASION_LOCKED": 15, "SUSPICIOUS": 5}.get(soc_state, 0)
-        return min(100, pred_component + uncertainty_component + risk_component + state_bonus)
+        state_bonus = {"FAILURE": 20, "EVASION_LOCKED": 15, "SUSPICIOUS": 5}.get(
+            soc_state, 0
+        )
+        return min(
+            100, pred_component + uncertainty_component + risk_component + state_bonus
+        )
 
     def _severity_to_priority(self, severity):
         if severity >= 80:
@@ -187,20 +217,24 @@ class IncidentReporter:
         names = self.feature_names or [f"f{i}" for i in range(len(sample))]
         return dict(zip(names, [float(v) for v in sample]))
 
-    def _generate_recommendations(self, prediction, prediction_set,
-                                  risk_score, soc_state,
-                                  shap_exp, lime_exp):
+    def _generate_recommendations(
+        self, prediction, prediction_set, risk_score, soc_state, shap_exp, lime_exp
+    ):
         recs = []
         if prediction > 0.8:
             recs.append("BLOCK: Immediately quarantine source IP and notify Tier-2.")
         elif prediction > 0.5:
-            recs.append("INVESTIGATE: Manual analyst review recommended within 15 minutes.")
+            recs.append(
+                "INVESTIGATE: Manual analyst review recommended within 15 minutes."
+            )
 
         if len(prediction_set) > 1:
             recs.append("UNCERTAINTY: Model is unsure — escalate to senior analyst.")
 
         if soc_state in ("FAILURE", "EVASION_LOCKED"):
-            recs.append("SYSTEM ALERT: SOC is under stress — activate incident response playbook.")
+            recs.append(
+                "SYSTEM ALERT: SOC is under stress — activate incident response playbook."
+            )
 
         if shap_exp and shap_exp.get("top_features"):
             top_f = shap_exp["top_features"][0][0]
@@ -232,7 +266,7 @@ class IncidentReporter:
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Incident Report — {report['alert_id']}</title>
+    <title>Incident Report — {report["alert_id"]}</title>
     <style>
         body {{ font-family: 'Inter', sans-serif; background: #0d1117; color: #c9d1d9; padding: 2rem; }}
         .card {{ background: #161b22; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid #30363d; }}
@@ -247,21 +281,21 @@ class IncidentReporter:
 <body>
     <h1>🛡️ Incident Report</h1>
     <div class="card">
-        <strong>Alert ID:</strong> {report['alert_id']}<br>
-        <strong>Timestamp:</strong> {report['timestamp']}<br>
-        <strong>Severity:</strong> {report['severity']:.1f} <span class="priority">{report['priority']}</span>
+        <strong>Alert ID:</strong> {report["alert_id"]}<br>
+        <strong>Timestamp:</strong> {report["timestamp"]}<br>
+        <strong>Severity:</strong> {report["severity"]:.1f} <span class="priority">{report["priority"]}</span>
     </div>
     <div class="card">
         <h2>Prediction</h2>
-        <strong>Label:</strong> {report['prediction']['label']}<br>
-        <strong>P(malicious):</strong> {report['prediction']['malicious_probability']:.4f}<br>
-        <strong>Prediction Set:</strong> {report['prediction']['prediction_set']}<br>
-        <strong>Uncertainty:</strong> {report['prediction']['uncertainty']}
+        <strong>Label:</strong> {report["prediction"]["label"]}<br>
+        <strong>P(malicious):</strong> {report["prediction"]["malicious_probability"]:.4f}<br>
+        <strong>Prediction Set:</strong> {report["prediction"]["prediction_set"]}<br>
+        <strong>Uncertainty:</strong> {report["prediction"]["uncertainty"]}
     </div>
     <div class="card">
         <h2>Risk Assessment</h2>
-        <strong>Score:</strong> {report['risk']['score']:.2f}<br>
-        <strong>SOC State:</strong> {report['risk']['soc_state']}
+        <strong>Score:</strong> {report["risk"]["score"]:.2f}<br>
+        <strong>SOC State:</strong> {report["risk"]["soc_state"]}
     </div>
     <div class="card">{shap_html}</div>
     <div class="card">

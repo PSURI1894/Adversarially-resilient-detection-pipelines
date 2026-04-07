@@ -29,15 +29,19 @@ from src.models import TabTransformer, VAIDS, DeepEnsemble
 # ERRORS
 # ==============================================================================
 
+
 class EnsembleError(Exception):
     pass
+
 
 class DataShapeMismatchError(EnsembleError):
     pass
 
+
 # ==============================================================================
 # METRICS / AUDIT
 # ==============================================================================
+
 
 class ModelAuditor:
     """SOC-grade audit metrics (no accuracy lies)."""
@@ -66,9 +70,11 @@ class ModelAuditor:
         self.logger.info(f"AUDIT | F1={report['f1']:.4f} FDR={report['fdr']:.4f}")
         return report
 
+
 # ==============================================================================
 # ADVERSARIAL TRAINER (CNN)
 # ==============================================================================
+
 
 class ResilientTrainer:
     """
@@ -92,15 +98,17 @@ class ResilientTrainer:
         self.model = self._build()
 
     def _build(self):
-        model = models.Sequential([
-            layers.Input(shape=(self.input_dim, 1)),
-            layers.Conv1D(64, 3, activation="relu"),
-            layers.BatchNormalization(),
-            layers.Dropout(0.3),
-            layers.GlobalAveragePooling1D(),
-            layers.Dense(64, activation="relu"),
-            layers.Dense(1, activation="sigmoid")
-        ])
+        model = models.Sequential(
+            [
+                layers.Input(shape=(self.input_dim, 1)),
+                layers.Conv1D(64, 3, activation="relu"),
+                layers.BatchNormalization(),
+                layers.Dropout(0.3),
+                layers.GlobalAveragePooling1D(),
+                layers.Dense(64, activation="relu"),
+                layers.Dense(1, activation="sigmoid"),
+            ]
+        )
         model.compile(optimizer="adam", loss="binary_crossentropy")
         return model
 
@@ -122,12 +130,14 @@ class ResilientTrainer:
                 y_mix,
                 epochs=1,
                 batch_size=64,
-                verbose=0
+                verbose=0,
             )
+
 
 # ==============================================================================
 # ENSEMBLE ORCHESTRATOR
 # ==============================================================================
+
 
 @dataclass
 class EnsembleConfig:
@@ -138,11 +148,13 @@ class EnsembleConfig:
     deep_ensemble: dict = None
     weights: dict = None
 
+
 class LegacyEnsembleOrchestrator(BaseEstimator, ClassifierMixin):
     """
     Backward compatibility wrapper.
     Soft-voting ensemble compatible with conformal prediction.
     """
+
     def __init__(self, input_dim: int):
         self.input_dim = input_dim
         self.xgb = xgb.XGBClassifier(
@@ -169,12 +181,11 @@ class LegacyEnsembleOrchestrator(BaseEstimator, ClassifierMixin):
         self._check_shape(X)
         p_xgb = self.xgb.predict_proba(X)[:, 1]
         p_nn = self.nn.model.predict(
-            X.reshape(-1, self.input_dim, 1),
-            verbose=0
+            X.reshape(-1, self.input_dim, 1), verbose=0
         ).flatten()
         prob = 0.6 * p_xgb + 0.4 * p_nn
         return np.vstack([1 - prob, prob]).T
-    
+
     def fit_adversarially(self, X, y, eps=0.05, epochs=1):
         return self.fit(X, y, eps=eps, epochs=epochs)
 
@@ -183,23 +194,33 @@ class EnsembleOrchestrator(BaseEstimator, ClassifierMixin):
     """
     Pluggable registry-based Deep Ensemble with Stacking Meta-Learner.
     """
+
     def __init__(self, config_or_dim):
         if isinstance(config_or_dim, int):
             self.config = EnsembleConfig(input_dim=config_or_dim)
         else:
             self.config = config_or_dim
-            
+
         self.input_dim = self.config.input_dim
-        
+
         # Pluggable model registry
         self.models = {
-            "xgboost": xgb.XGBClassifier(**(self.config.xgb or {"use_label_encoder": False, "eval_metric": "logloss"})),
+            "xgboost": xgb.XGBClassifier(
+                **(
+                    self.config.xgb
+                    or {"use_label_encoder": False, "eval_metric": "logloss"}
+                )
+            ),
             "cnn": ResilientTrainer(self.input_dim),
-            "transformer": TabTransformer(self.input_dim, **(self.config.transformer or {})),
+            "transformer": TabTransformer(
+                self.input_dim, **(self.config.transformer or {})
+            ),
             "vae": VAIDS(self.input_dim, **(self.config.vae or {})),
-            "deep_ensemble": DeepEnsemble(self.input_dim, **(self.config.deep_ensemble or {})),
+            "deep_ensemble": DeepEnsemble(
+                self.input_dim, **(self.config.deep_ensemble or {})
+            ),
         }
-        
+
         self.stacker = LogisticRegression()
         self.is_fitted = False
 
@@ -208,24 +229,24 @@ class EnsembleOrchestrator(BaseEstimator, ClassifierMixin):
         # Train base models on the full dataset (except VAE, which trains unsupervised)
         self.models["xgboost"].fit(X, y)
         self.models["cnn"].fit(X, y)
-        
+
         tf_X = tf.constant(X, dtype=tf.float32)
         tf_y = tf.constant(y, dtype=tf.float32)
-        
-        self.models["transformer"].compile(optimizer='adam', loss='binary_crossentropy')
+
+        self.models["transformer"].compile(optimizer="adam", loss="binary_crossentropy")
         self.models["transformer"].fit(tf_X, tf_y, epochs=3, batch_size=256, verbose=0)
-        
+
         # VAE is unsupervised on benign traffic (y==0)
         benign_X = X[y == 0]
         if len(benign_X) > 0:
-            self.models["vae"].compile(optimizer='adam')
+            self.models["vae"].compile(optimizer="adam")
             self.models["vae"].fit(benign_X, epochs=3, batch_size=256, verbose=0)
-            
+
         self.models["deep_ensemble"].fit(X, y)
-        
+
         print("[INFO] Training stacking meta-learner...")
-        # For a true stacker, we would use out-of-fold predictions. 
-        # For simplicity here, we train stacker on training data predictions directly, 
+        # For a true stacker, we would use out-of-fold predictions.
+        # For simplicity here, we train stacker on training data predictions directly,
         # but in a complete setup we'd use k-fold cross_val_predict.
         # We simulate the features for the logistic regression:
         preds = self._get_base_predictions(X)
@@ -235,19 +256,25 @@ class EnsembleOrchestrator(BaseEstimator, ClassifierMixin):
 
     def _get_base_predictions(self, X: np.ndarray):
         p_xgb = self.models["xgboost"].predict_proba(X)[:, 1]
-        p_cnn = self.models["cnn"].model.predict(X.reshape(-1, self.input_dim, 1), verbose=0).flatten()
-        p_trans = self.models["transformer"].predict_proba(tf.constant(X, dtype=tf.float32))[:, 1]
-        
+        p_cnn = (
+            self.models["cnn"]
+            .model.predict(X.reshape(-1, self.input_dim, 1), verbose=0)
+            .flatten()
+        )
+        p_trans = self.models["transformer"].predict_proba(
+            tf.constant(X, dtype=tf.float32)
+        )[:, 1]
+
         # VAE pseudo-probabilities
         try:
             p_vae = self.models["vae"].predict_proba(X)[:, 1]
         except BaseException:
             # Fallback if VAE not properly fitted
             p_vae = np.zeros(len(X))
-            
+
         # Deep Ensemble
         p_de = self.models["deep_ensemble"].predict_proba(X)[:, 1]
-        
+
         return np.column_stack([p_xgb, p_cnn, p_trans, p_vae, p_de])
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:

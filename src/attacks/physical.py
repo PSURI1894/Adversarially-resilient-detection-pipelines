@@ -21,6 +21,7 @@ from src.attacks.white_box import AttackConfig, BaseAttack
 # FEATURE-CONSTRAINED EVASION
 # ═══════════════════════════════════════════════════════════════
 
+
 class FeatureConstrainedEvasion(BaseAttack):
     """
     Only perturbs attacker-controllable flow features while
@@ -33,12 +34,10 @@ class FeatureConstrainedEvasion(BaseAttack):
 
     @dataclass
     class PhysicalConstraints:
-        non_negative: List[str] = field(default_factory=lambda: [
-            "bytes", "pkts", "duration", "iat"
-        ])
-        integer_valued: List[str] = field(default_factory=lambda: [
-            "pkts", "packet"
-        ])
+        non_negative: List[str] = field(
+            default_factory=lambda: ["bytes", "pkts", "duration", "iat"]
+        )
+        integer_valued: List[str] = field(default_factory=lambda: ["pkts", "packet"])
         max_perturbation_ratio: float = 0.3  # at most 30% change
 
     def __init__(
@@ -57,13 +56,12 @@ class FeatureConstrainedEvasion(BaseAttack):
             return
         mutable_keywords = ["iat", "duration", "pkt", "bytes", "len"]
         self.config.mutable_features = [
-            i for i, name in enumerate(self.feature_names)
+            i
+            for i, name in enumerate(self.feature_names)
             if any(kw in name.lower() for kw in mutable_keywords)
         ]
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         cfg = self.config
         X_adv = X.copy()
 
@@ -81,9 +79,7 @@ class FeatureConstrainedEvasion(BaseAttack):
 
             # Apply physical constraints
             feature_name = (
-                self.feature_names[idx].lower()
-                if idx < len(self.feature_names)
-                else ""
+                self.feature_names[idx].lower() if idx < len(self.feature_names) else ""
             )
 
             # Non-negativity
@@ -103,6 +99,7 @@ class FeatureConstrainedEvasion(BaseAttack):
 # ═══════════════════════════════════════════════════════════════
 # SLOW-DRIP ATTACK
 # ═══════════════════════════════════════════════════════════════
+
 
 class SlowDripAttack(BaseAttack):
     """
@@ -131,9 +128,7 @@ class SlowDripAttack(BaseAttack):
         self.slowdown = slowdown
         self.compression = compression
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         X_adv = X.copy()
 
         for i, name in enumerate(self.feature_names):
@@ -166,6 +161,7 @@ class SlowDripAttack(BaseAttack):
 # ═══════════════════════════════════════════════════════════════
 # MIMICRY ATTACK — Statistical Profile Matching
 # ═══════════════════════════════════════════════════════════════
+
 
 class MimicryAttack(BaseAttack):
     """
@@ -203,9 +199,7 @@ class MimicryAttack(BaseAttack):
         km.fit(X_benign)
         self._centroids = km.cluster_centers_
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         if self._centroids is None:
             raise RuntimeError(
                 "Must call fit_benign_profile(X_benign) before generate()"

@@ -25,6 +25,7 @@ _MLFLOW_AVAILABLE = False
 try:
     import mlflow
     from mlflow.tracking import MlflowClient
+
     _MLFLOW_AVAILABLE = True
 except ImportError:
     mlflow = None
@@ -45,9 +46,12 @@ class ExperimentTracker:
         Directory for local JSON logs when MLflow is unavailable.
     """
 
-    def __init__(self, experiment_name: str = "ids-pipeline",
-                 tracking_uri: Optional[str] = None,
-                 fallback_dir: str = "reports/experiments"):
+    def __init__(
+        self,
+        experiment_name: str = "ids-pipeline",
+        tracking_uri: Optional[str] = None,
+        fallback_dir: str = "reports/experiments",
+    ):
         self.experiment_name = experiment_name
         self.fallback_dir = Path(fallback_dir)
         self.fallback_dir.mkdir(parents=True, exist_ok=True)
@@ -64,7 +68,9 @@ class ExperimentTracker:
                 mlflow.set_experiment(experiment_name)
                 self._client = MlflowClient()
                 self._use_mlflow = True
-                logger.info(f"MLflow tracker initialised (experiment={experiment_name})")
+                logger.info(
+                    f"MLflow tracker initialised (experiment={experiment_name})"
+                )
             except Exception as e:
                 logger.warning(f"MLflow unavailable ({e}), using local fallback")
 
@@ -72,8 +78,9 @@ class ExperimentTracker:
     # Run lifecycle
     # ------------------------------------------------------------------
 
-    def start_run(self, run_name: Optional[str] = None,
-                  tags: Optional[Dict[str, str]] = None) -> str:
+    def start_run(
+        self, run_name: Optional[str] = None, tags: Optional[Dict[str, str]] = None
+    ) -> str:
         """Start a new experiment run. Returns run ID."""
         if self._use_mlflow:
             self._active_run = mlflow.start_run(run_name=run_name)
@@ -123,9 +130,9 @@ class ExperimentTracker:
         elif self._active_run:
             if key not in self._active_run["metrics"]:
                 self._active_run["metrics"][key] = []
-            self._active_run["metrics"][key].append({
-                "value": value, "step": step, "timestamp": time.time()
-            })
+            self._active_run["metrics"][key].append(
+                {"value": value, "step": step, "timestamp": time.time()}
+            )
 
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
         """Log multiple metrics at once."""
@@ -150,8 +157,12 @@ class ExperimentTracker:
     # Pipeline-specific auto-logging
     # ------------------------------------------------------------------
 
-    def log_pipeline_stage(self, stage: str, metrics: Dict[str, float],
-                           params: Optional[Dict[str, Any]] = None):
+    def log_pipeline_stage(
+        self,
+        stage: str,
+        metrics: Dict[str, float],
+        params: Optional[Dict[str, Any]] = None,
+    ):
         """
         Convenience method for logging a complete pipeline stage.
 
@@ -173,8 +184,9 @@ class ExperimentTracker:
 
         self.set_tag(f"stage_{stage}", "completed")
 
-    def log_attack_result(self, attack_type: str, epsilon: float,
-                          metrics: Dict[str, float]):
+    def log_attack_result(
+        self, attack_type: str, epsilon: float, metrics: Dict[str, float]
+    ):
         """Log results from an adversarial attack evaluation."""
         self.set_tag("attack_type", attack_type)
         self.log_metric("attack/epsilon", epsilon)
@@ -185,13 +197,15 @@ class ExperimentTracker:
     # Model logging
     # ------------------------------------------------------------------
 
-    def log_model(self, model, artifact_path: str = "model",
-                  registered_name: Optional[str] = None):
+    def log_model(
+        self, model, artifact_path: str = "model", registered_name: Optional[str] = None
+    ):
         """Log a model to the tracking backend."""
         if self._use_mlflow:
             try:
                 mlflow.sklearn.log_model(
-                    model, artifact_path,
+                    model,
+                    artifact_path,
                     registered_model_name=registered_name,
                 )
             except Exception:
@@ -207,8 +221,9 @@ class ExperimentTracker:
     # Comparison & retrieval
     # ------------------------------------------------------------------
 
-    def get_best_run(self, metric: str = "evaluation/f1",
-                     ascending: bool = False) -> Optional[Dict]:
+    def get_best_run(
+        self, metric: str = "evaluation/f1", ascending: bool = False
+    ) -> Optional[Dict]:
         """Get the best run by a given metric."""
         if self._use_mlflow:
             experiment = mlflow.get_experiment_by_name(self.experiment_name)

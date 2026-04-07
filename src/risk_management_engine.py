@@ -27,6 +27,7 @@ from src.conformal.online_cp import OnlineConformalPredictor
 # ENUMS & EXCEPTIONS
 # ==============================================================================
 
+
 class SOCState(Enum):
     STABLE = 1
     SUSPICIOUS = 2
@@ -50,6 +51,7 @@ class CalibrationError(Exception):
 # CONFORMAL ENGINE — THIN ADAPTER
 # ==============================================================================
 
+
 class ConformalEngine:
     """
     Unified adapter that delegates to the appropriate conformal backend.
@@ -67,9 +69,12 @@ class ConformalEngine:
         Extra kwargs forwarded to the selected backend constructor.
     """
 
-    def __init__(self, alpha: float = 0.05,
-                 backend: ConformalBackend = ConformalBackend.SPLIT,
-                 **backend_kwargs):
+    def __init__(
+        self,
+        alpha: float = 0.05,
+        backend: ConformalBackend = ConformalBackend.SPLIT,
+        **backend_kwargs,
+    ):
         self.alpha = alpha
         self.backend_type = backend
         self.calibrated = False
@@ -85,13 +90,9 @@ class ConformalEngine:
                 alpha=alpha, ptt=True, **backend_kwargs
             )
         elif backend == ConformalBackend.ONLINE:
-            self._backend = OnlineConformalPredictor(
-                alpha=alpha, **backend_kwargs
-            )
+            self._backend = OnlineConformalPredictor(alpha=alpha, **backend_kwargs)
         elif backend == ConformalBackend.ADAPTIVE:
-            self._backend = AdaptiveConformalPredictor(
-                alpha=alpha, **backend_kwargs
-            )
+            self._backend = AdaptiveConformalPredictor(alpha=alpha, **backend_kwargs)
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
@@ -123,7 +124,7 @@ class ConformalEngine:
 
     @property
     def q_hat(self):
-        return getattr(self._backend, 'q_hat', None)
+        return getattr(self._backend, "q_hat", None)
 
     def get_prediction_sets(self, probs: np.ndarray):
         """Legacy API: takes probabilities directly (SPLIT backend only)."""
@@ -180,6 +181,7 @@ class _SplitCP:
 # RISK THERMOSTAT v2 — MULTI-SIGNAL FSM WITH HYSTERESIS
 # ==============================================================================
 
+
 class RiskThermostat:
     """
     Finite-state SOC controller driven by multiple signals.
@@ -207,11 +209,14 @@ class RiskThermostat:
         Minimum seconds in a state before allowing transition.
     """
 
-    def __init__(self, analyst_capacity: int = 50,
-                 warning_threshold: float = 1.1,
-                 critical_threshold: float = 1.8,
-                 hysteresis_steps: int = 3,
-                 cooldown_seconds: float = 0.0):
+    def __init__(
+        self,
+        analyst_capacity: int = 50,
+        warning_threshold: float = 1.1,
+        critical_threshold: float = 1.8,
+        hysteresis_steps: int = 3,
+        cooldown_seconds: float = 0.0,
+    ):
         self.state = SOCState.STABLE
         self.analyst_capacity = analyst_capacity
         self.warning_threshold = warning_threshold
@@ -242,9 +247,12 @@ class RiskThermostat:
     # Core evaluation
     # ------------------------------------------------------------------
 
-    def evaluate(self, prediction_sets: List[List[int]],
-                 calibration_drift: float = 0.0,
-                 disagreement: float = 0.0) -> SOCState:
+    def evaluate(
+        self,
+        prediction_sets: List[List[int]],
+        calibration_drift: float = 0.0,
+        disagreement: float = 0.0,
+    ) -> SOCState:
         """
         Evaluate the current SOC state from multiple signals.
 
@@ -268,8 +276,9 @@ class RiskThermostat:
         self.alert_debt += uncertain_count
 
         # ----- Compute severity score (0-100) -----
-        severity = self._compute_severity(avg_uncertainty, calibration_drift,
-                                          disagreement)
+        severity = self._compute_severity(
+            avg_uncertainty, calibration_drift, disagreement
+        )
         self.severity_history.append(severity)
 
         # ----- Determine proposed state -----
@@ -285,8 +294,10 @@ class RiskThermostat:
 
             # Check if hysteresis threshold is met AND cooldown has elapsed
             elapsed = time.time() - self._last_transition_time
-            if (self._proposed_state_counts[proposed] >= self.hysteresis_steps
-                    and elapsed >= self.cooldown_seconds):
+            if (
+                self._proposed_state_counts[proposed] >= self.hysteresis_steps
+                and elapsed >= self.cooldown_seconds
+            ):
                 self.state = proposed
                 self._last_transition_time = time.time()
                 # Reset all counters
@@ -312,9 +323,9 @@ class RiskThermostat:
         else:
             return SOCState.STABLE
 
-    def _compute_severity(self, avg_uncertainty: float,
-                          calibration_drift: float,
-                          disagreement: float) -> float:
+    def _compute_severity(
+        self, avg_uncertainty: float, calibration_drift: float, disagreement: float
+    ) -> float:
         """
         Continuous 0-100 risk severity score fusing multiple signals.
 
@@ -323,14 +334,12 @@ class RiskThermostat:
         """
         # Normalize uncertainty: 1.0 → 0, critical_threshold → 80
         u_norm = np.clip(
-            (avg_uncertainty - 1.0) / (self.critical_threshold - 1.0) * 80,
-            0, 100
+            (avg_uncertainty - 1.0) / (self.critical_threshold - 1.0) * 80, 0, 100
         )
 
         # Alert debt ratio (0-100)
         debt_ratio = np.clip(
-            self.alert_debt / (self.analyst_capacity + 1e-8) * 100,
-            0, 100
+            self.alert_debt / (self.analyst_capacity + 1e-8) * 100, 0, 100
         )
 
         # Drift (assumed 0-1 range, scale to 0-100)
@@ -339,10 +348,9 @@ class RiskThermostat:
         # Disagreement (assumed 0-1 range, scale to 0-100)
         disagree_norm = np.clip(disagreement * 100, 0, 100)
 
-        severity = (0.50 * u_norm
-                     + 0.20 * debt_ratio
-                     + 0.15 * drift_norm
-                     + 0.15 * disagree_norm)
+        severity = (
+            0.50 * u_norm + 0.20 * debt_ratio + 0.15 * drift_norm + 0.15 * disagree_norm
+        )
 
         return float(np.clip(severity, 0, 100))
 
@@ -378,6 +386,7 @@ class RiskThermostat:
 # DASHBOARD / VISUALIZATION
 # ==============================================================================
 
+
 class SOCDashboard:
     """Lightweight uncertainty visualization for SOC leads."""
 
@@ -400,10 +409,10 @@ class SOCDashboard:
 
     def plot_severity(self, severity_history: List[float]):
         plt.figure(figsize=(10, 4))
-        plt.fill_between(range(len(severity_history)), severity_history,
-                         alpha=0.4, color="crimson")
-        plt.plot(severity_history, linewidth=2, color="crimson",
-                 label="Severity Score")
+        plt.fill_between(
+            range(len(severity_history)), severity_history, alpha=0.4, color="crimson"
+        )
+        plt.plot(severity_history, linewidth=2, color="crimson", label="Severity Score")
         plt.axhline(30, linestyle="--", color="orange", alpha=0.7, label="Warning")
         plt.axhline(70, linestyle="--", color="red", alpha=0.7, label="Critical")
         plt.xlabel("Evaluation Step")

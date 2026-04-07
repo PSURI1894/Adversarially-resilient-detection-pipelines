@@ -4,6 +4,7 @@ TEST SUITE — ADVANCED MODELS & DEEP ENSEMBLE
 ================================================================================
 ≥25 test cases for TabTransformer, VAIDS, DeepEnsemble, Adversarial Training, and Calibration.
 """
+
 import pytest
 import numpy as np
 import tensorflow as tf
@@ -11,10 +12,19 @@ import tensorflow as tf
 from src.models.tab_transformer import TabTransformer
 from src.models.variational_autoencoder import VAIDS
 from src.models.deep_ensemble import DeepEnsemble
-from src.models.adversarial_trainer import PGDTrainer, TRADESTrainer, FreeAdversarialTrainer
-from src.models.calibration import TemperatureScaling, IsotonicCalibration, CalibrationAudit
+from src.models.adversarial_trainer import (
+    PGDTrainer,
+    TRADESTrainer,
+    FreeAdversarialTrainer,
+)
+from src.models.calibration import (
+    TemperatureScaling,
+    IsotonicCalibration,
+    CalibrationAudit,
+)
 
 # ── FIXTURES ───────────────────────────────────────────────────
+
 
 @pytest.fixture
 def sample_data():
@@ -23,14 +33,17 @@ def sample_data():
     y = (X.sum(axis=1) > 0).astype(int)
     return X, y
 
+
 @pytest.fixture
 def base_model():
     # A simple TF model for testing wrappers
     inputs = tf.keras.Input(shape=(10,))
-    x = tf.keras.layers.Dense(16, activation='relu')(inputs)
-    outputs = tf.keras.layers.Dense(1, activation='linear')(x) # logits
+    x = tf.keras.layers.Dense(16, activation="relu")(inputs)
+    outputs = tf.keras.layers.Dense(1, activation="linear")(x)  # logits
     model = tf.keras.Model(inputs, outputs)
-    model.compile(optimizer='adam', loss=tf.keras.losses.BinaryCrossentropy(from_logits=True))
+    model.compile(
+        optimizer="adam", loss=tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    )
     return model
 
 
@@ -38,40 +51,44 @@ def base_model():
 # 1. TAB-TRANSFORMER TESTS
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestTabTransformer:
     def test_output_shape_probabilities(self, sample_data):
         X, _ = sample_data
         model = TabTransformer(num_numerical_features=X.shape[1])
-        model.compile(optimizer='adam', loss='binary_crossentropy')
+        model.compile(optimizer="adam", loss="binary_crossentropy")
         probs = model.predict_proba(X[:10])
         assert probs.shape == (10, 2)
         assert np.all((probs >= 0) & (probs <= 1))
         assert np.allclose(np.sum(probs, axis=1), 1.0)
-        
+
     def test_forward_pass_dims(self, sample_data):
         X, _ = sample_data
-        model = TabTransformer(num_numerical_features=X.shape[1], embed_dim=16, num_heads=2)
+        model = TabTransformer(
+            num_numerical_features=X.shape[1], embed_dim=16, num_heads=2
+        )
         out = model(X[:5])
         assert out.shape == (5, 1)
 
     def test_training_reduces_loss(self, sample_data):
         X, y = sample_data
         model = TabTransformer(num_numerical_features=X.shape[1])
-        model.compile(optimizer='adam', loss='binary_crossentropy')
+        model.compile(optimizer="adam", loss="binary_crossentropy")
         hist = model.fit(X, y, epochs=2, batch_size=32, verbose=0)
-        assert len(hist.history['loss']) == 2
-        
+        assert len(hist.history["loss"]) == 2
+
     def test_attention_mask_shapes_internal(self, sample_data):
         # We implicitly test this by passing through the blocks without crashing
         X, _ = sample_data
         model = TabTransformer(num_numerical_features=X.shape[1])
-        _ = model(X[:2]) # trigger build
+        _ = model(X[:2])  # trigger build
         assert len(model.layers) > 0
 
 
 # ═══════════════════════════════════════════════════════════════
 # 2. VARIATIONAL AUTOENCODER (VAIDS) TESTS
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestVAIDS:
     def test_latent_space_dims(self, sample_data):
@@ -92,10 +109,10 @@ class TestVAIDS:
     def test_training_dict_metrics(self, sample_data):
         X, _ = sample_data
         vae = VAIDS(input_dim=10)
-        vae.compile(optimizer='adam')
+        vae.compile(optimizer="adam")
         hist = vae.fit(X, epochs=2, batch_size=32, verbose=0)
-        assert 'reconstruction_loss' in hist.history
-        assert 'kl_loss' in hist.history
+        assert "reconstruction_loss" in hist.history
+        assert "kl_loss" in hist.history
 
     def test_anomaly_score_shape(self, sample_data):
         X, _ = sample_data
@@ -114,6 +131,7 @@ class TestVAIDS:
 # ═══════════════════════════════════════════════════════════════
 # 3. DEEP ENSEMBLE TESTS
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestDeepEnsemble:
     def test_initialization_members(self):
@@ -139,13 +157,14 @@ class TestDeepEnsemble:
     def test_training_loop(self, sample_data):
         X, y = sample_data
         de = DeepEnsemble(input_dim=10, n_members=2, epochs=1)
-        de.fit(X, y) # should not crash
+        de.fit(X, y)  # should not crash
         assert True
 
 
 # ═══════════════════════════════════════════════════════════════
 # 4. ADVERSARIAL TRAINERS TESTS
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestAdversarialTrainers:
     def test_pgd_trainer_generates_adv(self, sample_data, base_model):
@@ -159,7 +178,7 @@ class TestAdversarialTrainers:
 
     def test_pgd_trainer_mutable_mask(self, sample_data, base_model):
         X, y = sample_data
-        trainer = PGDTrainer(base_model, epsilon=1.0, iters=2, mutable_features=[0,1])
+        trainer = PGDTrainer(base_model, epsilon=1.0, iters=2, mutable_features=[0, 1])
         X_tf = tf.constant(X[:5])
         y_tf = tf.constant(y[:5])
         x_adv = trainer.generate_adversarial(X_tf, y_tf).numpy()
@@ -182,10 +201,11 @@ class TestAdversarialTrainers:
 
     def test_free_train_step(self, sample_data, base_model):
         X, y = sample_data
+
         # create a dummy generator
         def dummy_gen():
             yield tf.constant(X[:8]), tf.constant(y[:8])
-        
+
         trainer = FreeAdversarialTrainer(base_model, epsilon=0.1, m=2)
         opt = tf.keras.optimizers.Adam()
         loss = trainer.train_step_batch(dummy_gen(), opt)
@@ -195,6 +215,7 @@ class TestAdversarialTrainers:
 # ═══════════════════════════════════════════════════════════════
 # 5. CALIBRATION TESTS
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestCalibration:
     def test_temperature_scaling_bounds(self):
@@ -211,7 +232,7 @@ class TestCalibration:
         probs = cal.predict_proba(logits)
         assert probs.shape == (2, 2)
         assert np.allclose(probs[0], [0.5, 0.5])
-        
+
     def test_isotonic_calibration_fit_transform(self):
         cal = IsotonicCalibration()
         preds = np.random.rand(100)
@@ -239,7 +260,7 @@ class TestCalibration:
         logits = np.where(y_true == 1, 10.0, -10.0) + np.random.randn(1000) * 15.0
         uncalib_probs = 1 / (1 + np.exp(-logits))
         ece_before = CalibrationAudit.expected_calibration_error(y_true, uncalib_probs)
-        
+
         cal = TemperatureScaling()
         cal.fit(logits, y_true)
         calib_probs = cal.predict_proba(logits)[:, 1]
@@ -250,6 +271,8 @@ class TestCalibration:
     def test_reliability_diagram_data(self):
         y_true = np.random.randint(0, 2, 100)
         y_prob = np.random.rand(100)
-        confs, accs = CalibrationAudit.reliability_diagram_data(y_true, y_prob, n_bins=5)
+        confs, accs = CalibrationAudit.reliability_diagram_data(
+            y_true, y_prob, n_bins=5
+        )
         assert len(confs) == 5
         assert len(accs) == 5

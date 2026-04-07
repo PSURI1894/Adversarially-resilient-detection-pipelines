@@ -42,7 +42,6 @@ class DataSanitizer:
 
         return df
 
-
     @staticmethod
     def normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
         df.columns = (
@@ -87,9 +86,7 @@ class FeatureFactory:
     @staticmethod
     def extract_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
         if {"flow_iat_mean", "flow_iat_std"}.issubset(df.columns):
-            df["flow_burstiness"] = (
-                df["flow_iat_std"] / (df["flow_iat_mean"] + 1e-9)
-            )
+            df["flow_burstiness"] = df["flow_iat_std"] / (df["flow_iat_mean"] + 1e-9)
 
         for col in ["flow_duration", "tot_fwd_pkts", "tot_bwd_pkts"]:
             if col in df.columns:
@@ -190,11 +187,13 @@ class AttackStrategy:
     attack_type: str
     params: dict
 
+
 class AdversarialArsenal:
     """Thin facade over src.attacks with streaming generator pattern."""
 
     def __init__(self, feature_names: List[str]):
         from src.attacks import ATTACK_REGISTRY
+
         self.feature_names = feature_names
         self.registry = ATTACK_REGISTRY
         self.indices = [
@@ -210,26 +209,34 @@ class AdversarialArsenal:
         return X_adv + noise
 
     # === NEW FACADE API ===
-    def generate_streaming(self, model, X: np.ndarray, y: np.ndarray, strategy: AttackStrategy, batch_size: int = 10_000) -> Tuple[np.ndarray, np.ndarray]:
+    def generate_streaming(
+        self,
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        strategy: AttackStrategy,
+        batch_size: int = 10_000,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Streaming attack application via generator pattern for memory efficiency."""
         if strategy.attack_type not in self.registry:
             raise ValueError(f"Unknown attack: {strategy.attack_type}")
-            
+
         attack_class = self.registry[strategy.attack_type]
-        
+
         # Determine config based on attack
         # Many attacks use AttackConfig (white-box) or just take param kwargs (poisoning/GAN)
         try:
             from src.attacks.white_box import AttackConfig
+
             cfg = AttackConfig(mutable_features=self.indices, **strategy.params)
             attack = attack_class(cfg)
         except Exception:
             attack = attack_class(**strategy.params)
 
         for i in range(0, len(X), batch_size):
-            batch_X = X[i:i + batch_size]
-            batch_y = y[i:i + batch_size]
-            
+            batch_X = X[i : i + batch_size]
+            batch_y = y[i : i + batch_size]
+
             try:
                 batch_adv = attack.generate(model, batch_X, batch_y)
             except TypeError:
@@ -237,10 +244,12 @@ class AdversarialArsenal:
                     batch_adv = attack.generate(batch_X, batch_y)
                 except TypeError:
                     batch_adv = attack.generate(batch_X)
-                    
+
             yield batch_adv, batch_y
 
-    def apply_attack(self, model, X: np.ndarray, y: np.ndarray, strategy: AttackStrategy) -> np.ndarray:
+    def apply_attack(
+        self, model, X: np.ndarray, y: np.ndarray, strategy: AttackStrategy
+    ) -> np.ndarray:
         """Apply attack over whole dataset using the streaming generator."""
         chunks = []
         for batch_adv, _ in self.generate_streaming(model, X, y, strategy):
@@ -251,9 +260,6 @@ class AdversarialArsenal:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    orchestrator = DataOrchestrator(
-        raw_filename="02-14-2018.csv",
-        chunk_size=200_000
-    )
+    orchestrator = DataOrchestrator(raw_filename="02-14-2018.csv", chunk_size=200_000)
 
     orchestrator.ingest_and_process()

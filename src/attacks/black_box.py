@@ -19,6 +19,7 @@ from src.attacks.white_box import AttackConfig, BaseAttack
 # BOUNDARY ATTACK — Brendel et al. 2018
 # ═══════════════════════════════════════════════════════════════
 
+
 class BoundaryAttack(BaseAttack):
     """
     Decision-based Boundary Attack.
@@ -43,17 +44,13 @@ class BoundaryAttack(BaseAttack):
         self.delta = delta_init
         self.eps_step = epsilon_init
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         X_adv = X.copy()
         for i in range(len(X)):
             X_adv[i] = self._attack_single(model, X[i], y[i])
         return X_adv.astype(np.float32)
 
-    def _attack_single(
-        self, model, x: np.ndarray, y_true: int
-    ) -> np.ndarray:
+    def _attack_single(self, model, x: np.ndarray, y_true: int) -> np.ndarray:
         cfg = self.config
         dim = x.shape[0]
 
@@ -66,9 +63,11 @@ class BoundaryAttack(BaseAttack):
         for step in range(cfg.max_iter):
             # Orthogonal perturbation (stay on boundary sphere)
             perturbation = np.random.randn(dim)
-            perturbation -= np.dot(perturbation, x_adv - x) / (
-                np.linalg.norm(x_adv - x) ** 2 + 1e-12
-            ) * (x_adv - x)
+            perturbation -= (
+                np.dot(perturbation, x_adv - x)
+                / (np.linalg.norm(x_adv - x) ** 2 + 1e-12)
+                * (x_adv - x)
+            )
             perturbation = perturbation / (np.linalg.norm(perturbation) + 1e-12)
 
             d = np.linalg.norm(x_adv - x)
@@ -91,11 +90,11 @@ class BoundaryAttack(BaseAttack):
             # Adaptive step size
             ratio = np.linalg.norm(x_adv - x) / (d + 1e-12)
             if ratio < 1.0:
-                self.delta *= (1.0 + self.step_adapt)
-                self.eps_step *= (1.0 + self.step_adapt)
+                self.delta *= 1.0 + self.step_adapt
+                self.eps_step *= 1.0 + self.step_adapt
             else:
-                self.delta *= (1.0 - self.step_adapt)
-                self.eps_step *= (1.0 - self.step_adapt)
+                self.delta *= 1.0 - self.step_adapt
+                self.eps_step *= 1.0 - self.step_adapt
 
         return self._apply_feature_mask(
             x_adv.reshape(1, -1), x.reshape(1, -1)
@@ -108,12 +107,8 @@ class BoundaryAttack(BaseAttack):
         for _ in range(self.n_init_samples):
             noise = np.random.randn(*x.shape) * self.config.epsilon * 5
             candidate = x + noise
-            candidate = np.clip(
-                candidate, self.config.clip_min, self.config.clip_max
-            )
-            pred = int(
-                model.predict_proba(candidate.reshape(1, -1))[0, 1] > 0.5
-            )
+            candidate = np.clip(candidate, self.config.clip_min, self.config.clip_max)
+            pred = int(model.predict_proba(candidate.reshape(1, -1))[0, 1] > 0.5)
             if pred != y_true:
                 return candidate
         return None
@@ -122,6 +117,7 @@ class BoundaryAttack(BaseAttack):
 # ═══════════════════════════════════════════════════════════════
 # HOPSIPJUMP — Chen et al. 2020
 # ═══════════════════════════════════════════════════════════════
+
 
 class HopSkipJumpAttack(BaseAttack):
     """
@@ -144,17 +140,13 @@ class HopSkipJumpAttack(BaseAttack):
         self.binary_search_steps = binary_search_steps
         self.step_schedule = step_schedule
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         X_adv = X.copy()
         for i in range(len(X)):
             X_adv[i] = self._attack_single(model, X[i], y[i])
         return X_adv.astype(np.float32)
 
-    def _attack_single(
-        self, model, x: np.ndarray, y_true: int
-    ) -> np.ndarray:
+    def _attack_single(self, model, x: np.ndarray, y_true: int) -> np.ndarray:
         cfg = self.config
         dim = x.shape[0]
 
@@ -169,9 +161,7 @@ class HopSkipJumpAttack(BaseAttack):
             x_boundary = self._binary_search(model, x, x_adv, y_true)
 
             # ── Estimate gradient at boundary ───────────────────
-            grad_est = self._estimate_gradient(
-                model, x_boundary, y_true, dim
-            )
+            grad_est = self._estimate_gradient(model, x_boundary, y_true, dim)
 
             # ── Step along estimated gradient ───────────────────
             if self.step_schedule == "geometric":
@@ -183,9 +173,7 @@ class HopSkipJumpAttack(BaseAttack):
             x_adv = np.clip(x_adv, cfg.clip_min, cfg.clip_max)
 
             # Verify still adversarial
-            pred = int(
-                model.predict_proba(x_adv.reshape(1, -1))[0, 1] > 0.5
-            )
+            pred = int(model.predict_proba(x_adv.reshape(1, -1))[0, 1] > 0.5)
             if pred == y_true:
                 x_adv = x_boundary  # revert
 
@@ -200,9 +188,7 @@ class HopSkipJumpAttack(BaseAttack):
         for _ in range(self.binary_search_steps):
             mid = (lo + hi) / 2.0
             x_mid = (1 - mid) * x_orig + mid * x_adv
-            pred = int(
-                model.predict_proba(x_mid.reshape(1, -1))[0, 1] > 0.5
-            )
+            pred = int(model.predict_proba(x_mid.reshape(1, -1))[0, 1] > 0.5)
             if pred != y_true:
                 hi = mid  # closer to original
             else:
@@ -221,9 +207,7 @@ class HopSkipJumpAttack(BaseAttack):
             noise = noise / (np.linalg.norm(noise) + 1e-12) * delta
 
             x_plus = x_boundary + noise
-            pred = int(
-                model.predict_proba(x_plus.reshape(1, -1))[0, 1] > 0.5
-            )
+            pred = int(model.predict_proba(x_plus.reshape(1, -1))[0, 1] > 0.5)
             if pred != y_true:
                 grad += noise
             else:
@@ -236,6 +220,7 @@ class HopSkipJumpAttack(BaseAttack):
 # ═══════════════════════════════════════════════════════════════
 # TRANSFER ATTACK
 # ═══════════════════════════════════════════════════════════════
+
 
 class TransferAttack(BaseAttack):
     """
@@ -269,9 +254,7 @@ class TransferAttack(BaseAttack):
         )
         self.surrogate.fit(X_train, y_train)
 
-    def generate(
-        self, model, X: np.ndarray, y: np.ndarray
-    ) -> np.ndarray:
+    def generate(self, model, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         if self.surrogate is None:
             # Auto-train surrogate using the target's predictions
             y_pseudo = (model.predict_proba(X)[:, 1] > 0.5).astype(int)
@@ -287,9 +270,7 @@ class TransferAttack(BaseAttack):
             if cfg.norm == "l_inf":
                 X_adv = X_adv + cfg.step_size * np.sign(grad)
             else:
-                grad_norm = np.linalg.norm(
-                    grad, axis=1, keepdims=True
-                ) + 1e-12
+                grad_norm = np.linalg.norm(grad, axis=1, keepdims=True) + 1e-12
                 X_adv = X_adv + cfg.step_size * (grad / grad_norm)
 
             X_adv = self._project(X_adv, X)

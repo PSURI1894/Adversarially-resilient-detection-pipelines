@@ -29,6 +29,7 @@ _MLFLOW_AVAILABLE = False
 try:
     import mlflow
     from mlflow.tracking import MlflowClient
+
     _MLFLOW_AVAILABLE = True
 except ImportError:
     mlflow = None
@@ -57,10 +58,13 @@ class ModelRegistry:
         Metric to compare for promotion decisions.
     """
 
-    def __init__(self, registry_name: str = "ids-ensemble",
-                 local_registry_dir: str = "models/registry",
-                 promotion_threshold: float = 0.02,
-                 promotion_metric: str = "robust_f1"):
+    def __init__(
+        self,
+        registry_name: str = "ids-ensemble",
+        local_registry_dir: str = "models/registry",
+        promotion_threshold: float = 0.02,
+        promotion_metric: str = "robust_f1",
+    ):
         self.registry_name = registry_name
         self.local_dir = Path(local_registry_dir)
         self.local_dir.mkdir(parents=True, exist_ok=True)
@@ -86,9 +90,13 @@ class ModelRegistry:
     # Registration
     # ------------------------------------------------------------------
 
-    def register_model(self, model, metrics: Dict[str, float],
-                       model_params: Optional[Dict] = None,
-                       description: str = "") -> str:
+    def register_model(
+        self,
+        model,
+        metrics: Dict[str, float],
+        model_params: Optional[Dict] = None,
+        description: str = "",
+    ) -> str:
         """
         Register a new model version.
 
@@ -138,7 +146,8 @@ class ModelRegistry:
                     mlflow.log_params(model_params or {})
                     mlflow.log_metrics(metrics)
                     mlflow.sklearn.log_model(
-                        model, "model",
+                        model,
+                        "model",
                         registered_model_name=self.registry_name,
                     )
             except Exception as e:
@@ -153,7 +162,9 @@ class ModelRegistry:
     # Stage management
     # ------------------------------------------------------------------
 
-    def promote(self, version_id: str, target_stage: ModelStage = ModelStage.PRODUCTION) -> bool:
+    def promote(
+        self, version_id: str, target_stage: ModelStage = ModelStage.PRODUCTION
+    ) -> bool:
         """
         Promote a model version to a target stage.
         If promoting to PRODUCTION, archives the current production model.
@@ -193,13 +204,17 @@ class ModelRegistry:
         prod_score = prod_entry["metrics"].get(self.promotion_metric, 0)
 
         if new_score - prod_score >= self.promotion_threshold:
-            logger.info(f"Auto-promotion: {self.promotion_metric} "
-                         f"{prod_score:.4f} → {new_score:.4f} "
-                         f"(+{new_score - prod_score:.4f})")
+            logger.info(
+                f"Auto-promotion: {self.promotion_metric} "
+                f"{prod_score:.4f} → {new_score:.4f} "
+                f"(+{new_score - prod_score:.4f})"
+            )
             return self.promote(version_id, ModelStage.PRODUCTION)
         else:
-            logger.info(f"Auto-promotion denied: improvement "
-                         f"{new_score - prod_score:.4f} < threshold {self.promotion_threshold}")
+            logger.info(
+                f"Auto-promotion denied: improvement "
+                f"{new_score - prod_score:.4f} < threshold {self.promotion_threshold}"
+            )
             return False
 
     # ------------------------------------------------------------------

@@ -81,6 +81,7 @@ def fitted_model(synthetic_data):
 # 1. Data integrity: feature store stores and retrieves features correctly
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_feature_store_put_get(synthetic_data):
     """Feature store returns the exact vector that was stored."""
     from src.streaming.feature_store import FeatureStore
@@ -110,6 +111,7 @@ def test_feature_store_lru_eviction():
 # 2. Model training: ensemble fits and produces valid probabilities
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_model_predict_proba_shape(fitted_model, synthetic_data):
     """predict_proba returns (n, 2) array with values in [0,1]."""
     X = synthetic_data["X_test"]
@@ -131,6 +133,7 @@ def test_model_accuracy_above_chance(fitted_model, synthetic_data):
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Conformal calibration: q_hat is finite and coverage goal is met
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_conformal_calibration_produces_valid_qhat(fitted_model, synthetic_data):
     """RSCP+ calibrate() must produce a finite q_hat."""
@@ -176,6 +179,7 @@ def test_conformal_prediction_set_is_subset_of_classes(fitted_model, synthetic_d
 # 4. Adversarial resilience: coverage under PGD perturbation
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_conformal_coverage_maintained_under_pgd(fitted_model, synthetic_data):
     """Conformal coverage should not drop below 0.75 under small PGD perturbation."""
     from src.conformal.rscp import RandomizedSmoothedCP
@@ -217,6 +221,7 @@ def test_pgd_attack_reduces_accuracy(fitted_model, synthetic_data):
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Drift detection: detectors flag injected drift
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_adwin_detects_injected_drift():
     """ADWIN should flag drift when mean shifts abruptly."""
@@ -275,6 +280,7 @@ def test_consensus_detector_requires_majority():
 # 6. Adaptive retraining: retrainer produces a model with valid output
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_adaptive_retrainer_produces_valid_model(synthetic_data):
     """After retraining, new model must still produce valid probabilities."""
     from src.drift.adaptive_retrainer import AdaptiveRetrainingPipeline
@@ -284,7 +290,7 @@ def test_adaptive_retrainer_produces_valid_model(synthetic_data):
 
     retrainer = AdaptiveRetrainingPipeline(
         ensemble_orchestrator=None,
-        validation_gate=0.0,       # no improvement gate for test
+        validation_gate=0.0,  # no improvement gate for test
         active_learning_strategy="random",
     )
 
@@ -299,12 +305,14 @@ def test_adaptive_retrainer_produces_valid_model(synthetic_data):
 # 7. FastAPI server: smoke tests on REST endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def api_client():
     """Return a TestClient for the FastAPI app."""
     try:
         from fastapi.testclient import TestClient
         from src.api.server import app
+
         return TestClient(app)
     except Exception:
         return None
@@ -343,6 +351,7 @@ def test_api_alerts_endpoint(api_client):
 # 8. Benchmark suite smoke test
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_benchmark_suite_runs_without_error(synthetic_data, tmp_path, monkeypatch):
     """BenchmarkSuite.run() completes and returns a non-empty result list."""
     import experiments.benchmark_suite as bs
@@ -374,7 +383,9 @@ def test_benchmark_result_fields_valid(synthetic_data):
     d = synthetic_data
     model = _SimpleModel(d["X_train"], d["y_train"])
 
-    cfg = bs.BenchmarkConfig(epsilons=[0.05], attack_names=["pgd_linf"], n_test_samples=30)
+    cfg = bs.BenchmarkConfig(
+        epsilons=[0.05], attack_names=["pgd_linf"], n_test_samples=30
+    )
     suite = bs.BenchmarkSuite(model, None, d["X_test"], d["y_test"], config=cfg)
     results = suite.run()
 
@@ -388,6 +399,7 @@ def test_benchmark_result_fields_valid(synthetic_data):
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. Inference latency SLA
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_inference_latency_under_10ms_per_sample(fitted_model, synthetic_data):
     """Single-sample inference (predict_proba) must complete in < 10 ms on average."""
@@ -403,6 +415,7 @@ def test_inference_latency_under_10ms_per_sample(fitted_model, synthetic_data):
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. Streaming integrity: inference service processes a batch correctly
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_inference_service_batch_output_shape(synthetic_data):
     """InferenceService.run_batch() returns one prediction per input flow."""
@@ -423,6 +436,7 @@ def test_inference_service_batch_output_shape(synthetic_data):
 # ─────────────────────────────────────────────────────────────────────────────
 # 11. XAI explainability: report generator produces non-empty output
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_shap_engine_returns_attribution_array(fitted_model, synthetic_data):
     """SHAP engine must return an attribution array of the correct shape."""
