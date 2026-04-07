@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh run:*)",
+      "Bash(pip show:*)",
+      "Bash(python -m ruff check src/ tests/)",
+      "Bash(python3 -m ruff check src/ tests/)",
+      "Bash(find /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/src -name \"*.py\" -type f -exec grep -l \"  $\" {} \\\\;)"
+    ]
+  }
+}

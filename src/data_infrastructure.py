@@ -7,14 +7,12 @@ Component: Person 1 (Data & Adversary Lead)
 ================================================================================
 """
 
-import os
 import logging
 import traceback
 from typing import Tuple, List
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
 from pathlib import Path
 
@@ -66,16 +64,6 @@ class DataSanitizer:
         # Physical plausibility: no negative values
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         df[numeric_cols] = df[numeric_cols].clip(lower=0)
-
-        return df
-
-        # Fill NaN with robust medians
-        df = df.fillna(medians)
-
-        # Clamp negative values for duration-like fields (TEST EXPECTATION)
-        for col in df.columns:
-            if "duration" in col:
-                df[col] = df[col].clip(lower=0)
 
         return df
 

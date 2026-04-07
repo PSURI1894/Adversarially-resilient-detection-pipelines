@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"  $\" /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/src/data_infrastructure.py)",
+      "Bash(grep -rn \"  $\" /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/tests/)"
+    ]
+  }
+}

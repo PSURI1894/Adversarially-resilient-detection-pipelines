@@ -32,5 +32,5 @@ class TestModelLogic:
             probs = orch.predict_proba(X)
             assert probs.shape == (5, 2)
             assert np.allclose(probs.sum(axis=1), 1.0)
-        except:
+        except Exception:
             pytest.skip("Weights not initialized - requires fit() first")
