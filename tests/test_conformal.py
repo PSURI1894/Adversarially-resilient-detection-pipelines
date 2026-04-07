@@ -44,8 +44,9 @@ class TestRiskController:
         state1 = thermostat.evaluate_risk(stable_sets)
         assert state1 == SOCState.STABLE
 
-        # Batch 2: Highly Uncertain (Alert Debt will exceed capacity of 5)
+        # Batch 2: Highly Uncertain — repeat 3× to satisfy hysteresis_steps=3
         uncertain_sets = [[0, 1]] * 10
-        state2 = thermostat.evaluate_risk(uncertain_sets)
+        for _ in range(3):
+            state2 = thermostat.evaluate_risk(uncertain_sets)
         assert state2 == SOCState.EVASION_LOCKED
         assert thermostat.alert_debt >= 10

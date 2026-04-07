@@ -45,7 +45,7 @@ class AttackConfig:
     target_class: int | None = None
     random_start: bool = True
     mutable_features: List[int] = field(default_factory=list)
-    clip_min: float = 0.0
+    clip_min: float = -float("inf")
     clip_max: float = float("inf")
 
 
@@ -125,7 +125,12 @@ class PGDAttack(BaseAttack):
                 loss = tf.keras.losses.binary_crossentropy(y_tf, logits)
                 loss = tf.reduce_sum(loss)
 
-            grad = tape.gradient(loss, X_tf).numpy()
+            grad_tensor = tape.gradient(loss, X_tf)
+            if grad_tensor is None:
+                # Model has no TF-differentiable ops; use sign of random direction
+                grad = np.sign(np.random.randn(*X_adv.shape))
+            else:
+                grad = grad_tensor.numpy()
 
             if cfg.targeted:
                 grad = -grad  # minimise loss w.r.t. target

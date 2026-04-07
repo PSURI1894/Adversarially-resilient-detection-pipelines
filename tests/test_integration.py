@@ -155,7 +155,7 @@ def test_conformal_coverage_on_clean_data(fitted_model, synthetic_data):
     cp = RandomizedSmoothedCP(alpha=alpha, sigma=0.05, n_samples=10, ptt=False)
     cp.calibrate(fitted_model, d["X_cal"], d["y_cal"])
 
-    sets = cp.predict_set(fitted_model, d["X_test"])
+    sets = cp.prediction_sets(d["X_test"], fitted_model)
     coverage = np.mean([d["y_test"][i] in sets[i] for i in range(len(d["y_test"]))])
     assert coverage >= (1 - alpha) - 0.05, (
         f"Expected coverage ≥ {1 - alpha - 0.05:.2f}, got {coverage:.3f}"
@@ -169,7 +169,7 @@ def test_conformal_prediction_set_is_subset_of_classes(fitted_model, synthetic_d
     d = synthetic_data
     cp = RandomizedSmoothedCP(alpha=0.10, sigma=0.05, n_samples=10, ptt=False)
     cp.calibrate(fitted_model, d["X_cal"], d["y_cal"])
-    sets = cp.predict_set(fitted_model, d["X_test"][:20])
+    sets = cp.prediction_sets(d["X_test"][:20], fitted_model)
     for s in sets:
         for label in s:
             assert label in (0, 1), f"Invalid label in prediction set: {label}"
@@ -193,7 +193,7 @@ def test_conformal_coverage_maintained_under_pgd(fitted_model, synthetic_data):
     epsilon = 0.05
     X_adv = d["X_test"] + np.random.uniform(-epsilon, epsilon, d["X_test"].shape)
 
-    sets = cp.predict_set(fitted_model, X_adv)
+    sets = cp.prediction_sets(X_adv, fitted_model)
     coverage = np.mean([d["y_test"][i] in sets[i] for i in range(len(d["y_test"]))])
     assert coverage >= 0.75, (
         f"Coverage under adversarial perturbation too low: {coverage:.3f}"
@@ -246,7 +246,7 @@ def test_page_hinkley_detects_step_change():
     """Page-Hinkley should flag a sudden step increase in error rate."""
     from src.drift.drift_detector import PageHinkleyDetector
 
-    ph = PageHinkleyDetector(delta=0.005, threshold=50.0)
+    ph = PageHinkleyDetector(delta=0.005, lambda_threshold=50.0)
     for _ in range(100):
         ph.update(0.05 + np.random.normal(0, 0.01))
 

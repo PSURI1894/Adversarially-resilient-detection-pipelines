@@ -137,6 +137,26 @@ class FeatureStore:
             except Exception:
                 pass
 
+    def store(self, key: str, features):
+        """Store arbitrary data (dict or array). Alias used by integration tests."""
+        entry = {
+            "features": features,
+            "timestamp": time.time(),
+            "schema_version": self.schema_version,
+        }
+        if key in self._cache:
+            self._cache.move_to_end(key)
+        self._cache[key] = entry
+        if len(self._cache) > self.max_memory_items:
+            self._cache.popitem(last=False)
+
+    def retrieve(self, key: str):
+        """Retrieve stored data. Returns the raw features value (dict or array)."""
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            return self._cache[key]["features"]
+        return None
+
     # ------------------------------------------------------------------
     # Batch operations
     # ------------------------------------------------------------------

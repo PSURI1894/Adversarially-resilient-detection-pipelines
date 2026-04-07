@@ -80,6 +80,11 @@ class AdaptiveRetrainingPipeline:
         t0 = time.time()
         logger.info("Adaptive retraining triggered...")
 
+        # Use current_model as orchestrator when none is configured
+        orchestrator = (
+            self.orchestrator if self.orchestrator is not None else current_model
+        )
+
         # 1. Active Learning (Sample Selection)
         X_al, y_al = self._select_samples(current_model, X_train_new, y_train_new)
         logger.info(
@@ -91,10 +96,10 @@ class AdaptiveRetrainingPipeline:
         f1_old = self._evaluate_f1(current_model, X_holdout, y_holdout)
 
         # 3. Retrain
-        self.orchestrator.fit(X_al, y_al)
+        orchestrator.fit(X_al, y_al)
 
         # 4. Evaluate new model
-        f1_new = self._evaluate_f1(self.orchestrator, X_holdout, y_holdout)
+        f1_new = self._evaluate_f1(orchestrator, X_holdout, y_holdout)
         gain = f1_new - f1_old
 
         # 5. Record history
@@ -117,7 +122,7 @@ class AdaptiveRetrainingPipeline:
                 f"Retraining promoted: F1 {f1_old:.4f} → {f1_new:.4f} "
                 f"(+{gain:.4f} ≥ gate {self.validation_gate})"
             )
-            return self.orchestrator
+            return orchestrator
         else:
             logger.warning(
                 f"Retraining rolled back: F1 gain {gain:.4f} "

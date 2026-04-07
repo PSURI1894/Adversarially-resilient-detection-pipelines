@@ -147,7 +147,7 @@ class CalibrationIntegrityMonitor:
         recent = np.asarray(recent_scores, dtype=float)
         stat, p_value = ks_2samp(self.baseline_scores, recent)
         return {
-            "drift_detected": p_value < self.drift_threshold,
+            "drift_detected": bool(p_value < self.drift_threshold),
             "ks_stat": float(stat),
             "p_value": float(p_value),
         }

@@ -258,7 +258,7 @@ class TestOnlineCP:
         ocp.update_batch(mock_model, X, y)
         cov = ocp.rolling_coverage(100)
         # After 500 points, rolling coverage should be in a reasonable range
-        assert 0.5 < cov < 1.0
+        assert 0.5 < cov <= 1.0
 
     def test_exchangeability_check(self, mock_model, sample_data):
         from src.conformal.online_cp import OnlineConformalPredictor

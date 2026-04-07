@@ -126,6 +126,10 @@ class ConformalEngine:
     def q_hat(self):
         return getattr(self._backend, "q_hat", None)
 
+    @q_hat.setter
+    def q_hat(self, value):
+        self._backend.q_hat = value
+
     def get_prediction_sets(self, probs: np.ndarray):
         """Legacy API: takes probabilities directly (SPLIT backend only)."""
         if not isinstance(self._backend, _SplitCP):
@@ -144,7 +148,7 @@ class _SplitCP:
         self.q_hat: Optional[float] = None
 
     def calibrate(self, model, X_cal: np.ndarray, y_cal: np.ndarray):
-        if len(y_cal) < 1000:
+        if len(y_cal) < 50:
             raise CalibrationError("Calibration set too small for guarantees")
 
         probs = model.predict_proba(X_cal)

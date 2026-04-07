@@ -269,3 +269,29 @@ class ConceptDriftEngine:
     @property
     def last_results(self) -> Dict[str, bool]:
         return dict(self._last_results)
+
+
+class ConsensusDriftDetector:
+    """
+    Lightweight streaming drift detector with an update() interface.
+    Wraps ADWINDetector and PageHinkleyDetector; triggers when both agree.
+
+    Parameters
+    ----------
+    threshold : int
+        Minimum number of sub-detectors that must agree to signal drift.
+    """
+
+    def __init__(self, threshold: int = 2):
+        self.threshold = threshold
+        self._adwin = ADWINDetector()
+        self._ph = PageHinkleyDetector()
+
+    def update(self, value: float) -> bool:
+        """Process one observation. Returns True when consensus drift detected."""
+        hits = 0
+        if self._adwin.update(value):
+            hits += 1
+        if self._ph.update(value):
+            hits += 1
+        return bool(hits >= self.threshold)

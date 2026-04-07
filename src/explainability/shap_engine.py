@@ -98,8 +98,9 @@ class SHAPExplainer:
         # Handle multi-output: take class-1 (malicious) values
         if isinstance(shap_vals, list):
             shap_vals = shap_vals[1]
-        if shap_vals.ndim > 1:
-            shap_vals = shap_vals[0]
+        if shap_vals.ndim == 2:
+            # Shape is (n_features, n_classes) — take class-1 column
+            shap_vals = shap_vals[:, 1]
 
         pred = self.model.predict_proba(x)[0, 1]
         base = self._get_base_value()
@@ -128,6 +129,9 @@ class SHAPExplainer:
         shap_vals = self._compute_shap(X)
         if isinstance(shap_vals, list):
             shap_vals = shap_vals[1]  # class 1
+        if isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 3:
+            # Shape is (n_samples, n_features, n_classes) — take class-1
+            shap_vals = shap_vals[:, :, 1]
         return shap_vals
 
     # ------------------------------------------------------------------

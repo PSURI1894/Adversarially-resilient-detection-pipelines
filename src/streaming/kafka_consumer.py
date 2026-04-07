@@ -47,6 +47,11 @@ class SlidingWindowAggregator:
 
     def update(self, features: np.ndarray, timestamp: float):
         """Add a new observation and prune expired entries."""
+        # Auto-detect n_features from first real observation
+        if len(features) != self.n_features:
+            self.n_features = len(features)
+            self._agg_dim_per_window = self.n_features * 2 + 1
+            self._total_agg_dim = self._agg_dim_per_window * len(self.window_sizes)
         for w in self.window_sizes:
             buf = self._buffers[w]
             buf.append((timestamp, features))
