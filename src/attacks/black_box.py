@@ -10,9 +10,7 @@ Implements Boundary Attack, HopSkipJump, and Transfer Attack.
 from __future__ import annotations
 
 import numpy as np
-from dataclasses import dataclass, field
-from typing import List, Optional
-from abc import ABC, abstractmethod
+from typing import Optional
 
 from src.attacks.white_box import AttackConfig, BaseAttack
 

@@ -6,7 +6,7 @@ Temperature Scaling, Isotonic Regression, and Calibration Auditing.
 import numpy as np
 from sklearn.isotonic import IsotonicRegression
 from scipy.optimize import minimize
-from sklearn.metrics import brier_score_loss
+
 
 class TemperatureScaling:
     """Post-hoc Platt scaling with a single learned temperature parameter."""

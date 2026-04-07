@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import tensorflow as tf
 from dataclasses import dataclass, field
-from typing import Optional, List, Protocol, runtime_checkable
+from typing import List, Protocol, runtime_checkable
 from abc import ABC, abstractmethod
 
 
@@ -349,7 +349,6 @@ class AutoAttack(BaseAttack):
         Simplified Square Attack — random search in ε-ball.
         """
         cfg = self.config
-        X_adv = X.copy()
         best_adv = X.copy()
         preds = (model.predict_proba(X)[:, 1] > 0.5).astype(int)
         success = preds != y

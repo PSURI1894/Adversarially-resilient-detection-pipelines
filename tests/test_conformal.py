@@ -2,7 +2,6 @@
 PERSON 3: TEST SUITE (Uncertainty & Risk)
 Lines: ~250-300
 """
-import pytest
 import numpy as np
 from src.risk_management_engine import ConformalEngine, RiskThermostat, SOCState
 

@@ -14,9 +14,8 @@ Features:
 
 import json
 import time
-import asyncio
 import logging
-from typing import Dict, Set, Optional, Any, List
+from typing import Dict, Set, Optional, Any
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)

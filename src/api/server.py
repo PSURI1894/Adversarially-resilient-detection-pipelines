@@ -17,15 +17,12 @@ Endpoints:
 
 import time
 import uuid
-import asyncio
 import logging
-import numpy as np
-from typing import Dict, Any, Optional, List
+from typing import Dict, Optional, List
 from collections import deque
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.api.websocket_manager import WebSocketManager

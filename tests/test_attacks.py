@@ -7,7 +7,7 @@ TEST SUITE — ADVERSARIAL ATTACK LIBRARY
 """
 import pytest
 import numpy as np
-from unittest.mock import MagicMock
+
 
 # ── Helpers ─────────────────────────────────────────────────────
 
@@ -209,7 +209,6 @@ class TestLabelFlipPoisoning:
         X, y = sample_data
         _, y_p = atk.poison(X, y)
         # Only class-1 samples should have flipped
-        class0_unchanged = np.all(y_p[y == 0] == 0)
         # (Not always true because boundary mode, but targeted should only flip target)
         assert np.sum(y != y_p) > 0
 

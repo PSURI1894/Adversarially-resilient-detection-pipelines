@@ -15,11 +15,9 @@ Minimum: 15 integration test cases (each `test_*` function is one case).
 
 from __future__ import annotations
 
-import json
 import time
 import numpy as np
 import pytest
-from pathlib import Path
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler

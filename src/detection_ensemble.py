@@ -21,7 +21,6 @@ from tensorflow.keras import layers, models
 from sklearn.metrics import f1_score, roc_auc_score
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold
 from dataclasses import dataclass
 
 from src.models import TabTransformer, VAIDS, DeepEnsemble

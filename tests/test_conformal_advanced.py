@@ -8,7 +8,6 @@ ConformalEngine adapter, and RiskThermostat v2.
 """
 import pytest
 import numpy as np
-import time
 
 
 # ── MOCK MODEL ─────────────────────────────────────────────────

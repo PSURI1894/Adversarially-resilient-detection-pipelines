@@ -5,7 +5,7 @@ Lines: ~150-200
 import pytest
 import numpy as np
 import pandas as pd
-from src.data_infrastructure import DataOrchestrator, AdversarialArsenal, FeatureFactory
+from src.data_infrastructure import AdversarialArsenal, FeatureFactory
 
 
 class TestDataInfrastructure:

@@ -4,7 +4,6 @@ Lines: ~200-250
 """
 import pytest
 import numpy as np
-import tensorflow as tf
 from src.detection_ensemble import ResilientTrainer, EnsembleOrchestrator
 
 class TestModelLogic:

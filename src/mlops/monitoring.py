@@ -22,7 +22,7 @@ import time
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ _PROM_AVAILABLE = False
 try:
     from prometheus_client import (
         Histogram, Counter, Gauge, Info,
-        start_http_server, generate_latest, REGISTRY,
+        start_http_server,
     )
     _PROM_AVAILABLE = True
 except ImportError:

@@ -12,7 +12,6 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Optional
-from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 
 from src.attacks.white_box import AttackConfig, BaseAttack

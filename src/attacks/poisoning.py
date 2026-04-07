@@ -48,7 +48,8 @@ class LabelFlipPoisoning(BasePoisoning):
             for cls in [0, 1]:
                 c_idx = np.where(y == cls)[0]
                 o_idx = np.where(y == 1 - cls)[0]
-                if len(o_idx) == 0: continue
+                if len(o_idx) == 0:
+                    continue
                 centroid = X[o_idx].mean(axis=0)
                 dists = np.linalg.norm(X[c_idx] - centroid, axis=1)
                 k = int(len(c_idx) * self.config.fraction / 2)
@@ -117,7 +118,8 @@ class CalibrationPoisoning(BasePoisoning):
             centroids = {}
             for c in [0, 1]:
                 m = y == c
-                if m.any(): centroids[c] = X[m].mean(axis=0)
+                if m.any():
+                    centroids[c] = X[m].mean(axis=0)
             for i in idx:
                 if y[i] in centroids:
                     X_o[i] += self.score_delta * (centroids[y[i]] - X_o[i])

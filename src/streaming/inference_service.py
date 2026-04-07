@@ -15,7 +15,7 @@ Optimisations over v1:
 import time
 import logging
 import numpy as np
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List
 from collections import deque
 
 logger = logging.getLogger(__name__)
