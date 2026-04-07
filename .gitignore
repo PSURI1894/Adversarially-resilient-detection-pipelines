@@ -9,4 +9,6 @@ data/processed/
 # Logs & generated reports
 *.log
 reports/
-Y
+
+# Claude Code worktrees (contain Windows-absolute gitdir paths, break CI)
+.claude/worktrees/
