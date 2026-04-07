@@ -138,6 +138,10 @@ class SHAPExplainer:
     # Global explanations
     # ------------------------------------------------------------------
 
+    def explain(self, X: np.ndarray) -> np.ndarray:
+        """Alias for explain_batch — returns (n_samples, n_features) SHAP values."""
+        return self.explain_batch(X)
+
     def global_importance(self, X: np.ndarray) -> Dict[str, float]:
         """
         Mean absolute SHAP value per feature (global importance ranking).
@@ -204,3 +208,7 @@ class _PermutationSHAP:
                 all_shap[i, j] = float(preds_with.mean() - base_preds.mean())
 
         return all_shap
+
+
+# Alias for test compatibility
+SHAPEngine = SHAPExplainer

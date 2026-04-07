@@ -68,7 +68,7 @@ class VAIDS(Model):
             reconstruction = self.decoder(z)
             reconstruction_loss = tf.reduce_mean(
                 tf.reduce_sum(
-                    tf.keras.losses.mean_squared_error(data, reconstruction), axis=-1
+                    tf.reduce_mean(tf.square(data - reconstruction), axis=-1), axis=-1
                 )
                 * self.input_dim
             )

@@ -25,6 +25,7 @@ redis>=5.0
 fastapi>=0.104
 uvicorn>=0.24
 websockets>=12.0
+httpx>=0.24
 
 # ── Monitoring ───────────────────────────────────────────────
 prometheus-client>=0.19

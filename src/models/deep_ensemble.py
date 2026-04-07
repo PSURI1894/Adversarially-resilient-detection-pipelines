@@ -71,5 +71,5 @@ class DeepEnsemble:
     def get_epistemic_uncertainty(self):
         """Returns the variance across member predictions from the last predict_proba call."""
         if hasattr(self, "last_epistemic_uncertainty"):
-            return self.last_epistemic_uncertainty
+            return self.last_epistemic_uncertainty.squeeze(-1)
         return None

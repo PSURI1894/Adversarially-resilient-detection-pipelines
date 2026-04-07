@@ -195,7 +195,9 @@ class EnsembleOrchestrator(BaseEstimator, ClassifierMixin):
     Pluggable registry-based Deep Ensemble with Stacking Meta-Learner.
     """
 
-    def __init__(self, config_or_dim):
+    def __init__(self, config_or_dim=None, *, input_dim=None):
+        if input_dim is not None and config_or_dim is None:
+            config_or_dim = input_dim
         if isinstance(config_or_dim, int):
             self.config = EnsembleConfig(input_dim=config_or_dim)
         else:
@@ -206,10 +208,7 @@ class EnsembleOrchestrator(BaseEstimator, ClassifierMixin):
         # Pluggable model registry
         self.models = {
             "xgboost": xgb.XGBClassifier(
-                **(
-                    self.config.xgb
-                    or {"use_label_encoder": False, "eval_metric": "logloss"}
-                )
+                **(self.config.xgb or {"eval_metric": "logloss"})
             ),
             "cnn": ResilientTrainer(self.input_dim),
             "transformer": TabTransformer(

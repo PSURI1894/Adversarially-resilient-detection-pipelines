@@ -207,3 +207,14 @@ class RealtimeInferenceService:
         if not self._latency_buffer:
             return 0.0
         return float(np.percentile(list(self._latency_buffer), p))
+
+    def run_batch(self, X: np.ndarray) -> List[Dict[str, Any]]:
+        """Run batch inference on a raw feature matrix. Returns one result per row."""
+        results = []
+        for i in range(len(X)):
+            results.append(self.predict(X[i]))
+        return results
+
+
+# Alias for test compatibility
+InferenceService = RealtimeInferenceService
