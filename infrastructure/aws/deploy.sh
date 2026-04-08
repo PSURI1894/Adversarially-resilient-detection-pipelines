@@ -13,10 +13,20 @@
 #
 # Usage:
 #   chmod +x deploy.sh
-#   ./deploy.sh [--region us-east-1] [--key mykey] [--destroy]
+#   ./deploy.sh [--region us-east-1] [--key mykey] [--destroy] [--force]
+#
+#   --force   Terminate the existing EC2 instance and deploy fresh (use when
+#             the instance is in a broken state)
 # ==============================================================================
 
 set -euo pipefail
+
+# ── Auto-fix Windows CRLF line endings (Git Bash on Windows) ──
+# Uses grep -cP which is available in Git Bash; 'file' is not reliable on Windows
+if grep -qP '\r' "$0" 2>/dev/null; then
+  sed -i 's/\r//g' "$0"
+  exec bash "$0" "$@"
+fi
 
 # ── Configurable defaults ──────────────────────────────────────
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
@@ -38,11 +48,13 @@ error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
 # ── Parse args ────────────────────────────────────────────────
 DESTROY=false
+FORCE=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --region)   REGION="$2";   shift 2 ;;
     --key)      KEY_NAME="$2"; shift 2 ;;
     --destroy)  DESTROY=true;  shift ;;
+    --force)    FORCE=true;    shift ;;   # terminate old instance and redeploy fresh
     *)          error "Unknown argument: $1" ;;
   esac
 done
@@ -62,6 +74,31 @@ if $DESTROY; then
   info "Destroy complete."
   exit 0
 fi
+
+# ── Force mode: terminate existing instance so we start clean ─
+if $FORCE; then
+  warn "--force: terminating any existing ARDP instance..."
+  OLD_ID=$(aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=$TAG_NAME" "Name=instance-state-name,Values=running,stopped" \
+    --query "Reservations[0].Instances[0].InstanceId" --output text 2>/dev/null || echo "None")
+  if [[ "$OLD_ID" != "None" && -n "$OLD_ID" ]]; then
+    aws ec2 terminate-instances --instance-ids "$OLD_ID" > /dev/null
+    aws ec2 wait instance-terminated --instance-ids "$OLD_ID"
+    info "Terminated $OLD_ID — starting fresh"
+  fi
+fi
+
+# ── Cleanup trap: if THIS run created a new instance but fails ─
+NEWLY_CREATED_INSTANCE=""
+cleanup_on_error() {
+  local exit_code=$?
+  if [[ $exit_code -ne 0 && -n "$NEWLY_CREATED_INSTANCE" ]]; then
+    warn "Deploy failed (exit $exit_code). Terminating instance $NEWLY_CREATED_INSTANCE to avoid charges..."
+    aws ec2 terminate-instances --instance-ids "$NEWLY_CREATED_INSTANCE" > /dev/null 2>&1 || true
+    warn "Instance terminated. Fix the error and re-run ./deploy.sh"
+  fi
+}
+trap cleanup_on_error EXIT
 
 # ==============================================================================
 # STEP 1 — Security Group
@@ -109,9 +146,11 @@ if [[ "$INSTANCE_ID" == "None" || -z "$INSTANCE_ID" ]]; then
     --instance-type "$INSTANCE_TYPE" \
     --key-name "$KEY_NAME" \
     --security-group-ids "$SG_ID" \
+    --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":20,\"VolumeType\":\"gp2\"}}]" \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME}]" \
     --user-data file://ec2_userdata.sh \
     --query "Instances[0].InstanceId" --output text)
+  NEWLY_CREATED_INSTANCE="$INSTANCE_ID"   # trap will clean up if deploy fails
   info "Launched instance: $INSTANCE_ID"
 
   info "Waiting for instance to reach running state..."
@@ -140,9 +179,12 @@ done
 
 # Copy source code via scp (create tar locally, upload, then extract)
 info "Packaging source code..."
-tar --exclude='.git' --exclude='data/raw' --exclude='__pycache__' \
-  --exclude='*.pyc' --exclude='.venv' --exclude='node_modules' \
-  --exclude='infrastructure/aws/ardp-key.pem' \
+tar --exclude='./.git' --exclude='./data/raw' --exclude='./__pycache__' \
+  --exclude='./*.pyc' --exclude='./.venv' --exclude='./venv' \
+  --exclude='./tf_env' --exclude='./node_modules' \
+  --exclude='./dashboard/node_modules' \
+  --exclude='./infrastructure/aws/ardp-key.pem' \
+  --exclude='./*.db' --exclude='./mlflow.db' \
   -czf /tmp/ardp-deploy.tar.gz -C ../../ .
 
 info "Uploading to EC2..."
@@ -160,9 +202,22 @@ ssh -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" "ec2-user@$PUBLIC_IP" << 'R
   set -e
   cd /home/ec2-user/ardp
 
+  # Check disk space (need at least 5 GB free)
+  FREE_KB=$(df / | awk 'NR==2 {print $4}')
+  if [[ "$FREE_KB" -lt 5242880 ]]; then
+    echo "[ERROR] Less than 5 GB free on EC2 (${FREE_KB} KB). Cleaning Docker cache..."
+    sudo docker system prune -af --volumes 2>/dev/null || true
+    FREE_KB=$(df / | awk 'NR==2 {print $4}')
+    if [[ "$FREE_KB" -lt 3145728 ]]; then
+      echo "[ERROR] Still less than 3 GB free after prune. Aborting."
+      exit 1
+    fi
+  fi
+  echo "[INFO] Disk free: $(df -h / | awk 'NR==2 {print $4}')"
+
   # Install docker if not present
   if ! command -v docker &>/dev/null; then
-    sudo dnf install -y docker
+    sudo yum install -y docker
     sudo systemctl start docker
     sudo usermod -aG docker ec2-user
   fi
@@ -175,9 +230,15 @@ ssh -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" "ec2-user@$PUBLIC_IP" << 'R
     sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   fi
 
-  # Use the production compose (low-memory, no Kafka/Grafana)
-  cp infrastructure/aws/docker-compose.prod.yml docker-compose.override.yml
-  docker compose up -d --build
+  # Use ONLY the production compose — do NOT use override (it merges with
+  # the base docker-compose.yml which includes Kafka/Zookeeper/Grafana).
+  # --project-directory ensures build context '.' resolves to the project root,
+  # not relative to the compose file's own directory.
+  sudo docker compose \
+    --project-directory /home/ec2-user/ardp \
+    -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml \
+    up -d --build
+
   echo "Backend running. API: http://$(curl -s ifconfig.me):8000"
 REMOTE
 
@@ -230,10 +291,18 @@ info "Dashboard live: $DASHBOARD_URL"
 # ==============================================================================
 info "Step 6/7: Deploying Lambda health check..."
 
-# Package lambda
+# Package lambda (use python zipfile — zip not available on Windows Git Bash)
 LAMBDA_DIR="$(dirname "$0")"
 cd "$LAMBDA_DIR"
-zip -j lambda_health_check.zip lambda_health_check.py > /dev/null
+python3 -c "
+import zipfile, os
+with zipfile.ZipFile('lambda_health_check.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+    z.write('lambda_health_check.py', 'lambda_health_check.py')
+" 2>/dev/null || python -c "
+import zipfile
+with zipfile.ZipFile('lambda_health_check.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+    z.write('lambda_health_check.py', 'lambda_health_check.py')
+"
 
 # Create IAM role for Lambda (if not exists)
 LAMBDA_ROLE_ARN=$(aws iam get-role --role-name ardp-lambda-role \
@@ -304,6 +373,7 @@ rm -f lambda_health_check.zip
 # ==============================================================================
 # STEP 6 — Summary
 # ==============================================================================
+trap - EXIT   # clear cleanup trap — deploy succeeded, keep the instance
 info "Step 7/7: Deployment complete!"
 echo ""
 echo "============================================================"

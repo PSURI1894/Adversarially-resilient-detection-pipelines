@@ -1,1 +1,7 @@
 *.csv filter=lfs diff=lfs merge=lfs -text
+
+# Always use LF for shell scripts (prevents CRLF breaking bash on Windows)
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.py text eol=lf

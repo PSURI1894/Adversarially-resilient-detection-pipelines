@@ -6,7 +6,13 @@
       "Bash(py -3 -m ruff check src/ tests/)",
       "Bash(py -3 -m pip install ruff --quiet)",
       "Bash(py -3 -m ruff format --check src/ tests/)",
-      "Bash(py -3 -m ruff format src/ tests/)"
+      "Bash(py -3 -m ruff format src/ tests/)",
+      "Bash(aws ec2:*)",
+      "Bash(curl -sv --max-time 10 http://54.163.63.17:8000/)",
+      "Bash(curl -sv --max-time 10 http://54.163.63.17:80/)",
+      "Bash(curl -sv --max-time 10 http://54.163.63.17:443/)",
+      "Bash(curl -s --max-time 15 http://54.163.63.17:8000/api/status)",
+      "Bash(curl -s --max-time 15 http://54.163.63.17/api/status)"
     ]
   }
 }
