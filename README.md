@@ -10,23 +10,101 @@ under active adversarial pressure.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ Data Layer                                                      │
-│  Kafka / Streaming Ingestion ──► Feature Store ──► Adv. Augment│
-├─────────────────────────────────────────────────────────────────┤
-│ Detection Layer                                                 │
-│  Deep Ensemble: XGBoost + 1D-CNN + TabTransformer + VAE-IDS    │
-│  MLflow Model Registry                                          │
-├─────────────────────────────────────────────────────────────────┤
-│ Uncertainty & Defense Layer                                     │
-│  RSCP+ (Certified Conformal) ──► SHAP Fingerprint Detector     │
-│  Risk Thermostat FSM                                            │
-├─────────────────────────────────────────────────────────────────┤
-│ Operational Layer                                               │
-│  React + WebSocket SOC Dashboard                                │
-│  Automated Playbook Orchestrator                                │
-│  Concept Drift Monitor ──► Adaptive Retraining Pipeline        │
-└─────────────────────────────────────────────────────────────────┘
+flowchart LR
+
+%% ================= STYLES =================
+classDef data fill:#E3F2FD,stroke:#1E88E5,stroke-width:2px,color:#0D47A1;
+classDef detect fill:#E8F5E9,stroke:#43A047,stroke-width:2px,color:#1B5E20;
+classDef defense fill:#FFF3E0,stroke:#FB8C00,stroke-width:2px,color:#E65100;
+classDef ops fill:#F3E5F5,stroke:#8E24AA,stroke-width:2px,color:#4A148C;
+classDef infra fill:#ECEFF1,stroke:#546E7A,stroke-width:2px,color:#263238;
+classDef highlight fill:#FFEBEE,stroke:#E53935,stroke-width:3px,color:#B71C1C;
+
+%% ================= DATA LAYER =================
+subgraph DL[📦 Data Layer]
+    A[Kafka / Streaming Ingestion]
+    A2[Batch Data Sources]
+    B[Feature Store (Online + Offline)]
+    C[Adversarial Augmentation Engine]
+    D[Data Validation & Schema Checks]
+
+    A --> B
+    A2 --> B
+    B --> D --> C
+end
+class A,A2,B,C,D data
+
+%% ================= DETECTION =================
+subgraph DET[🔍 Detection Layer]
+    D1[XGBoost]
+    D2[1D-CNN]
+    D3[TabTransformer]
+    D4[VAE-IDS]
+
+    E[Ensemble Aggregator\n(Weighted / Voting)]
+    F[MLflow Model Registry]
+    F2[Model Versioning + Experiment Tracking]
+
+    D1 --> E
+    D2 --> E
+    D3 --> E
+    D4 --> E
+
+    E --> F --> F2
+end
+class D1,D2,D3,D4,E,F,F2 detect
+
+%% ================= DEFENSE =================
+subgraph DEF[🛡️ Uncertainty & Defense Layer]
+    G[RSCP+ Conformal Prediction\n(Uncertainty Quantification)]
+    H[SHAP Fingerprint Detector\n(Explainability + Attack Detection)]
+    I[Risk Thermostat FSM\n(Dynamic Risk Control)]
+    I2[Alert Scoring Engine]
+
+    G --> H --> I --> I2
+end
+class G,H,I,I2 defense
+
+%% ================= OPS =================
+subgraph OPS[⚙️ Operational Layer]
+    J[React + WebSocket Dashboard]
+    K[Automated Playbook Engine]
+    L[Concept Drift Monitor]
+    M[Adaptive Retraining Pipeline]
+    N[Alerting System (Slack / Email)]
+end
+class J,K,L,M,N ops
+
+%% ================= INFRA =================
+subgraph INFRA[🧱 Infrastructure Layer]
+    X[Docker / Kubernetes]
+    Y[CI/CD Pipeline]
+    Z[Logging + Monitoring (Prometheus / Grafana)]
+end
+class X,Y,Z infra
+
+%% ================= FLOW =================
+C ==> D1
+C ==> D2
+C ==> D3
+C ==> D4
+
+F ==> G
+I2 ==> J
+J ==> K
+I2 ==> N
+
+L ==> M
+M ==> F
+
+%% ================= INFRA LINKS =================
+X --- DET
+X --- DEF
+Y --- F
+Z --- J
+
+%% Highlight core intelligence
+class E highlight
 ```
 
 **Key guarantees:**
