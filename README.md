@@ -10,80 +10,49 @@ under active adversarial pressure.
 ## 🏗️ Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
 
 %% ================= NEON STYLES =================
 classDef data fill:#0f172a,stroke:#00E5FF,stroke-width:2px,color:#00E5FF;
 classDef detect fill:#0f172a,stroke:#00FF9C,stroke-width:2px,color:#00FF9C;
 classDef defense fill:#0f172a,stroke:#FF9100,stroke-width:2px,color:#FF9100;
 classDef ops fill:#0f172a,stroke:#D500F9,stroke-width:2px,color:#D500F9;
-classDef infra fill:#0f172a,stroke:#90A4AE,stroke-width:2px,color:#CFD8DC;
 classDef highlight fill:#1a1a2e,stroke:#FF1744,stroke-width:3px,color:#FF1744;
 
-%% ================= DATA =================
-subgraph DL[Data Layer]
-    A[Kafka Streaming]
-    A2[Batch Sources]
-    B[Feature Store]
-    D[Validation]
-    C[Adversarial Augment]
-
-    A --> B
-    A2 --> B
-    B --> D --> C
+%% ================= DATA LAYER =================
+subgraph DL[📦 Data Layer]
+    A[Kafka / Streaming Ingestion] --> B[Feature Store] --> C[Adversarial Augmentation]
 end
-class A,A2,B,C,D data
+class A,B,C data
 
 %% ================= DETECTION =================
-subgraph DET[Detection Layer]
+subgraph DET[🔍 Detection Layer]
     D1[XGBoost]
     D2[1D CNN]
     D3[TabTransformer]
     D4[VAE IDS]
 
-    E[Ensemble Core]
-    F[MLflow Registry]
-    F2[Model Versioning]
-
-    D1 --> E
+    D1 --> E[Ensemble Core]
     D2 --> E
     D3 --> E
     D4 --> E
 
-    E --> F --> F2
+    E --> F[MLflow Model Registry]
 end
-class D1,D2,D3,D4,E,F,F2 detect
+class D1,D2,D3,D4,E,F detect
 
 %% ================= DEFENSE =================
-subgraph DEF[Defense Layer]
-    G[RSCP Conformal]
-    H[SHAP Detector]
-    I[Risk Thermostat]
-    I2[Alert Scoring]
-
-    G --> H --> I --> I2
+subgraph DEF[🛡️ Uncertainty and Defense]
+    G[RSCP Conformal] --> H[SHAP Fingerprint Detector] --> I[Risk Thermostat FSM]
 end
-class G,H,I,I2 defense
+class G,H,I defense
 
 %% ================= OPS =================
-subgraph OPS[Operations]
-    J[Dashboard]
-    K[Playbook Engine]
-    L[Drift Monitor]
-    M[Retraining]
-    N[Alerts]
-
-    L --> M
+subgraph OPS[⚙️ Operational Layer]
+    J[React WebSocket Dashboard] --> K[Playbook Orchestrator]
+    L[Concept Drift Monitor] --> M[Adaptive Retraining]
 end
-class J,K,L,M,N ops
-
-%% ================= INFRA =================
-subgraph INFRA[Infrastructure]
-    X[Docker K8s]
-    Y[CI CD]
-    Z[Monitoring]
-end
-class X,Y,Z infra
+class J,K,L,M ops
 
 %% ================= FLOW =================
 C ==> D1
@@ -92,31 +61,11 @@ C ==> D3
 C ==> D4
 
 F ==> G
-I2 ==> J
-J ==> K
-I2 ==> N
+I ==> J
+K ==> L
 
-M ==> F
-
-%% ================= INFRA LINKS =================
-X --- DET
-X --- DEF
-Y --- F
-Z --- J
-
-%% Highlight core
+%% highlight core
 class E highlight
-
-%% ================= CLICKABLE LINKS =================
-click A "https://github.com/your-repo/data-ingestion"
-click B "https://github.com/your-repo/feature-store"
-click D1 "https://github.com/your-repo/models/xgboost"
-click D2 "https://github.com/your-repo/models/cnn"
-click D3 "https://github.com/your-repo/models/transformer"
-click D4 "https://github.com/your-repo/models/vae"
-click E "https://github.com/your-repo/ensemble"
-click G "https://github.com/your-repo/conformal"
-click J "https://github.com/your-repo/dashboard"
 ```
 
 ## Quick Start
