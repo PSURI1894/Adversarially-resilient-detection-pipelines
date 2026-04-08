@@ -1,0 +1,71 @@
+# ==============================================================================
+# CD PIPELINE — ADVERSARIALLY RESILIENT IDS
+# ==============================================================================
+# Triggers: after CI passes on main
+# Jobs: deploy latest code to EC2, rebuild and restart Docker containers
+#
+# Required GitHub Secrets:
+#   EC2_HOST       — Public IP of your EC2 instance (e.g. 52.204.133.3)
+#   EC2_SSH_KEY    — Contents of ardp-key.pem
+# ==============================================================================
+
+name: CD Pipeline
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:   # allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ardp-key.pem
+          chmod 400 ~/.ssh/ardp-key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/ardp-key.pem ec2-user@${{ secrets.EC2_HOST }} << 'REMOTE'
+            set -e
+            cd /home/ec2-user/ardp
+
+            echo "Pulling latest code from GitHub..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "Rebuilding and restarting containers..."
+            cp infrastructure/aws/docker-compose.prod.yml docker-compose.override.yml
+            docker compose up -d --build --remove-orphans
+
+            echo "Waiting for API to be healthy..."
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:8000/api/status > /dev/null 2>&1; then
+                echo "API is healthy!"
+                break
+              fi
+              echo "Waiting... attempt $i/12"
+              sleep 10
+            done
+
+            echo "Deployment complete!"
+            docker compose ps
+          REMOTE
+
+      - name: Verify deployment
+        run: |
+          sleep 5
+          curl -sf http://${{ secrets.EC2_HOST }}:8000/api/status \
+            && echo "Deployment verified successfully" \
+            || echo "::warning::API health check failed — check EC2 logs"
