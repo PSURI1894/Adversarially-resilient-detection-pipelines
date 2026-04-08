@@ -1,6 +1,21 @@
 # Python cache
 __pycache__/
 *.pyc
+*.pyd
+*.pth
+
+# Virtual environments
+tf_env/
+.venv/
+venv/
+env/
+
+# AWS / secrets
+infrastructure/aws/ardp-key.pem
+
+# Database files
+mlflow.db
+*.db
 
 # Data (never push raw/processed datasets)
 data/raw/
