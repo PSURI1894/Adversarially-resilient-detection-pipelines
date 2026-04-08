@@ -7,26 +7,26 @@ under active adversarial pressure.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-```
+```mermaid
 flowchart LR
 
-%% ================= STYLES =================
-classDef data fill:#E3F2FD,stroke:#1E88E5,stroke-width:2px,color:#0D47A1;
-classDef detect fill:#E8F5E9,stroke:#43A047,stroke-width:2px,color:#1B5E20;
-classDef defense fill:#FFF3E0,stroke:#FB8C00,stroke-width:2px,color:#E65100;
-classDef ops fill:#F3E5F5,stroke:#8E24AA,stroke-width:2px,color:#4A148C;
-classDef infra fill:#ECEFF1,stroke:#546E7A,stroke-width:2px,color:#263238;
-classDef highlight fill:#FFEBEE,stroke:#E53935,stroke-width:3px,color:#B71C1C;
+%% ================= NEON STYLES =================
+classDef data fill:#0f172a,stroke:#00E5FF,stroke-width:2px,color:#00E5FF;
+classDef detect fill:#0f172a,stroke:#00FF9C,stroke-width:2px,color:#00FF9C;
+classDef defense fill:#0f172a,stroke:#FF9100,stroke-width:2px,color:#FF9100;
+classDef ops fill:#0f172a,stroke:#D500F9,stroke-width:2px,color:#D500F9;
+classDef infra fill:#0f172a,stroke:#90A4AE,stroke-width:2px,color:#CFD8DC;
+classDef highlight fill:#1a1a2e,stroke:#FF1744,stroke-width:3px,color:#FF1744;
 
-%% ================= DATA LAYER =================
+%% ================= DATA =================
 subgraph DL[📦 Data Layer]
-    A[Kafka / Streaming Ingestion]
-    A2[Batch Data Sources]
-    B[Feature Store (Online + Offline)]
-    C[Adversarial Augmentation Engine]
-    D[Data Validation & Schema Checks]
+    A[Kafka / Streaming]
+    A2[Batch Sources]
+    B[Feature Store]
+    D[Validation]
+    C[Adversarial Augment]
 
     A --> B
     A2 --> B
@@ -35,15 +35,15 @@ end
 class A,A2,B,C,D data
 
 %% ================= DETECTION =================
-subgraph DET[🔍 Detection Layer]
+subgraph DET[🔍 Detection]
     D1[XGBoost]
     D2[1D-CNN]
     D3[TabTransformer]
     D4[VAE-IDS]
 
-    E[Ensemble Aggregator\n(Weighted / Voting)]
-    F[MLflow Model Registry]
-    F2[Model Versioning + Experiment Tracking]
+    E[ENSEMBLE CORE<br/>(Weighted Voting)]
+    F[MLflow Registry]
+    F2[Versioning + Experiments]
 
     D1 --> E
     D2 --> E
@@ -55,31 +55,33 @@ end
 class D1,D2,D3,D4,E,F,F2 detect
 
 %% ================= DEFENSE =================
-subgraph DEF[🛡️ Uncertainty & Defense Layer]
-    G[RSCP+ Conformal Prediction\n(Uncertainty Quantification)]
-    H[SHAP Fingerprint Detector\n(Explainability + Attack Detection)]
-    I[Risk Thermostat FSM\n(Dynamic Risk Control)]
-    I2[Alert Scoring Engine]
+subgraph DEF[🛡️ Defense]
+    G[RSCP+<br/>Uncertainty]
+    H[SHAP Detector]
+    I[Risk Thermostat]
+    I2[Alert Scoring]
 
     G --> H --> I --> I2
 end
 class G,H,I,I2 defense
 
 %% ================= OPS =================
-subgraph OPS[⚙️ Operational Layer]
-    J[React + WebSocket Dashboard]
-    K[Automated Playbook Engine]
-    L[Concept Drift Monitor]
-    M[Adaptive Retraining Pipeline]
-    N[Alerting System (Slack / Email)]
+subgraph OPS[⚙️ Operations]
+    J[Live Dashboard]
+    K[Playbook Engine]
+    L[Drift Monitor]
+    M[Retraining Pipeline]
+    N[Alerts]
+
+    L --> M
 end
 class J,K,L,M,N ops
 
 %% ================= INFRA =================
-subgraph INFRA[🧱 Infrastructure Layer]
-    X[Docker / Kubernetes]
-    Y[CI/CD Pipeline]
-    Z[Logging + Monitoring (Prometheus / Grafana)]
+subgraph INFRA[🧱 Infra]
+    X[Docker / K8s]
+    Y[CI/CD]
+    Z[Monitoring]
 end
 class X,Y,Z infra
 
@@ -94,7 +96,6 @@ I2 ==> J
 J ==> K
 I2 ==> N
 
-L ==> M
 M ==> F
 
 %% ================= INFRA LINKS =================
@@ -103,8 +104,20 @@ X --- DEF
 Y --- F
 Z --- J
 
-%% Highlight core intelligence
+%% Highlight brain
 class E highlight
+
+%% ================= CLICKABLE LINKS =================
+click A "https://github.com/your-repo/data-ingestion"
+click B "https://github.com/your-repo/feature-store"
+click D1 "https://github.com/your-repo/models/xgboost"
+click D2 "https://github.com/your-repo/models/cnn"
+click D3 "https://github.com/your-repo/models/transformer"
+click D4 "https://github.com/your-repo/models/vae"
+click E "https://github.com/your-repo/ensemble"
+click G "https://github.com/your-repo/conformal"
+click H "https://github.com/your-repo/shap"
+click J "https://github.com/your-repo/dashboard"
 ```
 
 **Key guarantees:**
