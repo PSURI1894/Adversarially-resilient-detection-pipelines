@@ -7,34 +7,66 @@ under active adversarial pressure.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
+```mermaid
+flowchart TB
+
+%% ================= NEON STYLES =================
+classDef data fill:#0f172a,stroke:#00E5FF,stroke-width:2px,color:#00E5FF;
+classDef detect fill:#0f172a,stroke:#00FF9C,stroke-width:2px,color:#00FF9C;
+classDef defense fill:#0f172a,stroke:#FF9100,stroke-width:2px,color:#FF9100;
+classDef ops fill:#0f172a,stroke:#D500F9,stroke-width:2px,color:#D500F9;
+classDef highlight fill:#1a1a2e,stroke:#FF1744,stroke-width:3px,color:#FF1744;
+
+%% ================= DATA LAYER =================
+subgraph DL[📦 Data Layer]
+    A[Kafka / Streaming Ingestion] --> B[Feature Store] --> C[Adversarial Augmentation]
+end
+class A,B,C data
+
+%% ================= DETECTION =================
+subgraph DET[🔍 Detection Layer]
+    D1[XGBoost]
+    D2[1D CNN]
+    D3[TabTransformer]
+    D4[VAE IDS]
+
+    D1 --> E[Ensemble Core]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+
+    E --> F[MLflow Model Registry]
+end
+class D1,D2,D3,D4,E,F detect
+
+%% ================= DEFENSE =================
+subgraph DEF[🛡️ Uncertainty and Defense]
+    G[RSCP Conformal] --> H[SHAP Fingerprint Detector] --> I[Risk Thermostat FSM]
+end
+class G,H,I defense
+
+%% ================= OPS =================
+subgraph OPS[⚙️ Operational Layer]
+    J[React WebSocket Dashboard] --> K[Playbook Orchestrator]
+    L[Concept Drift Monitor] --> M[Adaptive Retraining]
+end
+class J,K,L,M ops
+
+%% ================= FLOW =================
+C ==> D1
+C ==> D2
+C ==> D3
+C ==> D4
+
+F ==> G
+I ==> J
+K ==> L
+
+%% highlight core
+class E highlight
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ Data Layer                                                      │
-│  Kafka / Streaming Ingestion ──► Feature Store ──► Adv. Augment│
-├─────────────────────────────────────────────────────────────────┤
-│ Detection Layer                                                 │
-│  Deep Ensemble: XGBoost + 1D-CNN + TabTransformer + VAE-IDS    │
-│  MLflow Model Registry                                          │
-├─────────────────────────────────────────────────────────────────┤
-│ Uncertainty & Defense Layer                                     │
-│  RSCP+ (Certified Conformal) ──► SHAP Fingerprint Detector     │
-│  Risk Thermostat FSM                                            │
-├─────────────────────────────────────────────────────────────────┤
-│ Operational Layer                                               │
-│  React + WebSocket SOC Dashboard                                │
-│  Automated Playbook Orchestrator                                │
-│  Concept Drift Monitor ──► Adaptive Retraining Pipeline        │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Key guarantees:**
-- Certified conformal coverage ≥ 1−α under adversarial perturbations bounded by radius r*
-- Adversarial evasion detection without ground-truth adversarial labels
-- Automatic drift recovery within N epochs of consensus drift signal
-
----
 
 ## Quick Start
 
