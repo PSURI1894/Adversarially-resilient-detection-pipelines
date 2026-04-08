@@ -21,8 +21,8 @@ classDef infra fill:#0f172a,stroke:#90A4AE,stroke-width:2px,color:#CFD8DC;
 classDef highlight fill:#1a1a2e,stroke:#FF1744,stroke-width:3px,color:#FF1744;
 
 %% ================= DATA =================
-subgraph DL[📦 Data Layer]
-    A[Kafka / Streaming]
+subgraph DL[Data Layer]
+    A[Kafka Streaming]
     A2[Batch Sources]
     B[Feature Store]
     D[Validation]
@@ -35,15 +35,15 @@ end
 class A,A2,B,C,D data
 
 %% ================= DETECTION =================
-subgraph DET[🔍 Detection]
+subgraph DET[Detection Layer]
     D1[XGBoost]
-    D2[1D-CNN]
+    D2[1D CNN]
     D3[TabTransformer]
-    D4[VAE-IDS]
+    D4[VAE IDS]
 
-    E[ENSEMBLE CORE<br/>(Weighted Voting)]
+    E[Ensemble Core]
     F[MLflow Registry]
-    F2[Versioning + Experiments]
+    F2[Model Versioning]
 
     D1 --> E
     D2 --> E
@@ -55,8 +55,8 @@ end
 class D1,D2,D3,D4,E,F,F2 detect
 
 %% ================= DEFENSE =================
-subgraph DEF[🛡️ Defense]
-    G[RSCP+<br/>Uncertainty]
+subgraph DEF[Defense Layer]
+    G[RSCP Conformal]
     H[SHAP Detector]
     I[Risk Thermostat]
     I2[Alert Scoring]
@@ -66,11 +66,11 @@ end
 class G,H,I,I2 defense
 
 %% ================= OPS =================
-subgraph OPS[⚙️ Operations]
-    J[Live Dashboard]
+subgraph OPS[Operations]
+    J[Dashboard]
     K[Playbook Engine]
     L[Drift Monitor]
-    M[Retraining Pipeline]
+    M[Retraining]
     N[Alerts]
 
     L --> M
@@ -78,9 +78,9 @@ end
 class J,K,L,M,N ops
 
 %% ================= INFRA =================
-subgraph INFRA[🧱 Infra]
-    X[Docker / K8s]
-    Y[CI/CD]
+subgraph INFRA[Infrastructure]
+    X[Docker K8s]
+    Y[CI CD]
     Z[Monitoring]
 end
 class X,Y,Z infra
@@ -104,7 +104,7 @@ X --- DEF
 Y --- F
 Z --- J
 
-%% Highlight brain
+%% Highlight core
 class E highlight
 
 %% ================= CLICKABLE LINKS =================
@@ -116,16 +116,8 @@ click D3 "https://github.com/your-repo/models/transformer"
 click D4 "https://github.com/your-repo/models/vae"
 click E "https://github.com/your-repo/ensemble"
 click G "https://github.com/your-repo/conformal"
-click H "https://github.com/your-repo/shap"
 click J "https://github.com/your-repo/dashboard"
 ```
-
-**Key guarantees:**
-- Certified conformal coverage ≥ 1−α under adversarial perturbations bounded by radius r*
-- Adversarial evasion detection without ground-truth adversarial labels
-- Automatic drift recovery within N epochs of consensus drift signal
-
----
 
 ## Quick Start
 
