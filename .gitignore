@@ -10,5 +10,9 @@ data/processed/
 *.log
 reports/
 
+# Node
+node_modules/
+package-lock.json
+
 # Claude Code worktrees (contain Windows-absolute gitdir paths, break CI)
 .claude/worktrees/

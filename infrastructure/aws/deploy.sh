@@ -138,11 +138,22 @@ for i in $(seq 1 20); do
   sleep 10
 done
 
-# rsync source code (exclude large data files)
-rsync -az --exclude='.git' --exclude='data/raw' --exclude='__pycache__' \
+# Copy source code via scp (create tar locally, upload, then extract)
+info "Packaging source code..."
+tar --exclude='.git' --exclude='data/raw' --exclude='__pycache__' \
   --exclude='*.pyc' --exclude='.venv' --exclude='node_modules' \
-  -e "ssh -o StrictHostKeyChecking=no -i ${KEY_NAME}.pem" \
-  ../../  "ec2-user@$PUBLIC_IP:/home/ec2-user/ardp/"
+  --exclude='infrastructure/aws/ardp-key.pem' \
+  -czf /tmp/ardp-deploy.tar.gz -C ../../ .
+
+info "Uploading to EC2..."
+scp -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" \
+  /tmp/ardp-deploy.tar.gz "ec2-user@$PUBLIC_IP:/home/ec2-user/ardp-deploy.tar.gz"
+
+info "Extracting on EC2..."
+ssh -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" "ec2-user@$PUBLIC_IP" \
+  "mkdir -p /home/ec2-user/ardp && tar -xzf /home/ec2-user/ardp-deploy.tar.gz -C /home/ec2-user/ardp/ && rm /home/ec2-user/ardp-deploy.tar.gz"
+
+rm -f /tmp/ardp-deploy.tar.gz
 
 # Start the application via docker compose
 ssh -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" "ec2-user@$PUBLIC_IP" << 'REMOTE'
