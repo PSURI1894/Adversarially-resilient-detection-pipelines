@@ -42,11 +42,12 @@ function FeatureBar({ name, value, maxVal, isPositive }) {
 }
 
 export default function ExplainPanel({ alert }) {
-  const [explanation, setExplanation] = useState(null);
+  const [serverExplanation, setServerExplanation] = useState(null);
 
   useEffect(() => {
-    if (!alert?.id) { setExplanation(null); return; }
-    api.getExplain(alert.id).then(setExplanation).catch(() => setExplanation(null));
+    if (!alert?.id) { setServerExplanation(null); return; }
+    // Best-effort server fetch for richer data; alert object already has SHAP inline
+    api.getExplain(alert.id).then(setServerExplanation).catch(() => {});
   }, [alert?.id]);
 
   if (!alert) {
@@ -54,16 +55,16 @@ export default function ExplainPanel({ alert }) {
       <div className="glass-panel" style={{ height: '100%' }}>
         <div className="glass-panel-header"><span>XAI Explanation</span></div>
         <div className="glass-panel-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12, height: 200 }}>
-          Select an alert to view explanation
+          Waiting for first alert...
         </div>
       </div>
     );
   }
 
-  // Use SHAP values if available, otherwise generate placeholder feature importance
-  const shapValues = explanation?.shap_values || [];
-  const shapFeatures = explanation?.shap_features || [];
-  const topFeatures = explanation?.top_features || [];
+  // Prefer inline SHAP data (already in the alert from WebSocket) — fall back to server fetch
+  const shapValues   = alert.shap_values   ?? serverExplanation?.shap_values   ?? [];
+  const shapFeatures = alert.shap_features ?? serverExplanation?.shap_features ?? [];
+  const topFeatures  = alert.top_features  ?? serverExplanation?.top_features  ?? [];
 
   const hasShap = shapValues.length > 0 && shapFeatures.length > 0;
   const features = hasShap

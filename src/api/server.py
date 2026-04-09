@@ -378,9 +378,12 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 "severity": round(severity, 3),
                 "shap_values": shap_vals,
                 "shap_features": _FEATURES,
-                "top_features": sorted(
-                    zip(_FEATURES, shap_vals), key=lambda x: abs(x[1]), reverse=True
-                )[:5],
+                "top_features": [
+                    {"name": n, "value": v}
+                    for n, v in sorted(
+                        zip(_FEATURES, shap_vals), key=lambda x: abs(x[1]), reverse=True
+                    )[:5]
+                ],
             }
             state.push_alert(alert)
 

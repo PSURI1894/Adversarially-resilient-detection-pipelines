@@ -45,7 +45,11 @@ export default function App() {
   // ── Handle WebSocket messages ────────────────────────────
   useEffect(() => {
     if (!lastMessage) return;
-    if (lastMessage.type === 'alert') addAlert(lastMessage.data);
+    if (lastMessage.type === 'alert') {
+      addAlert(lastMessage.data);
+      // Auto-select latest alert so XAI panel always shows something
+      setSelectedAlert(lastMessage.data);
+    }
     if (lastMessage.type === 'state' || lastMessage.type === 'state_update') {
       setStatus((prev) => prev ? { ...prev, ...lastMessage.data } : lastMessage.data);
     }
