@@ -59,10 +59,17 @@ export default function AttackSimulator({ wsEvents }) {
     }
   }, [wsEvents]);
 
-  // Restore state on mount (e.g. page reload while attack is running)
+  // Restore state on mount (handles page reload while attack is running)
   useEffect(() => {
     api.simulationStatus?.().then((s) => {
-      if (s?.active) setActiveAttack({ sim_id: s.sim_id, epsilon: s.epsilon });
+      if (s?.active) {
+        setActiveAttack({
+          sim_id: s.sim_id,
+          epsilon: s.epsilon,
+          duration_seconds: s.duration_seconds,
+        });
+        if (s.time_remaining > 0) startCountdown(s.time_remaining);
+      }
     }).catch(() => {});
   }, []);
 

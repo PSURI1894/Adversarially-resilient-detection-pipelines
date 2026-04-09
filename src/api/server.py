@@ -319,6 +319,8 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
     epsilon = 0.1        # attack strength; updated by /api/simulate
     attack_active = False  # True while a simulation is running
     active_sim_id: Optional[str] = None
+    attack_start_time: float = 0.0
+    attack_duration: float = 0.0
 
     async def _demo_loop():
         """Push synthetic alerts and metrics every ~2 s in demo mode."""
@@ -441,9 +443,10 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
         @app.post("/api/simulate", include_in_schema=False)
         async def trigger_simulation_demo(request: SimulateRequest):
-            nonlocal epsilon, attack_active, active_sim_id
+            nonlocal epsilon, attack_active, active_sim_id, attack_start_time, attack_duration
             epsilon = request.epsilon
             attack_active = True
+            attack_start_time = time.time()
             result = await original_simulate(request)
             active_sim_id = result["sim_id"]
             await ws_manager.broadcast(
@@ -452,6 +455,7 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             )
             # Auto-stop: 2 ms per sample, minimum 10 s, maximum 120 s
             duration = max(10.0, min(request.n_samples * 0.002, 120.0))
+            attack_duration = duration
             asyncio.create_task(_auto_stop(result["sim_id"], duration))
             result["duration_seconds"] = round(duration)
             return result
@@ -475,10 +479,14 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
         @app.get("/api/simulate/status")
         async def simulation_status():
+            elapsed = time.time() - attack_start_time if attack_active else 0
+            time_remaining = max(0, round(attack_duration - elapsed)) if attack_active else 0
             return {
                 "active": attack_active,
                 "sim_id": active_sim_id,
                 "epsilon": epsilon,
+                "time_remaining": time_remaining,
+                "duration_seconds": round(attack_duration),
             }
 
     return app
