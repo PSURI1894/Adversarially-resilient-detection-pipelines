@@ -316,11 +316,13 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         "psh_flag_cnt", "ack_flag_cnt", "init_fwd_win_byts",
     ]
 
-    epsilon = 0.1  # attack strength; updated by /api/simulate
+    epsilon = 0.1        # attack strength; updated by /api/simulate
+    attack_active = False  # True while a simulation is running
+    active_sim_id: Optional[str] = None
 
     async def _demo_loop():
         """Push synthetic alerts and metrics every ~2 s in demo mode."""
-        nonlocal epsilon
+        nonlocal epsilon, attack_active
         tick = 0
 
         while True:
@@ -328,11 +330,16 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             tick += 1
             t = time.time()
 
+            # When no attack is active, decay severity back toward baseline
+            effective_eps = epsilon if attack_active else max(0.0, epsilon - 0.02)
+            if not attack_active:
+                epsilon = effective_eps
+
             # Slowly escalate then cool down (sine wave severity)
             phase = (tick % 60) / 60.0                        # 0 → 1 over 2 min
             base_severity = 0.3 + 0.7 * abs(math.sin(math.pi * phase))
             noise = random.uniform(-0.05, 0.05)
-            severity = min(1.0, max(0.0, base_severity * (1 + epsilon * 3) + noise))
+            severity = min(1.0, max(0.0, base_severity * (1 + effective_eps * 3) + noise))
 
             # SOC state
             if severity > 0.75:
@@ -410,14 +417,45 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         async def start_demo():
             asyncio.create_task(_demo_loop())
 
-        # Patch /api/simulate to update attack strength so the demo reacts
         original_simulate = trigger_simulation
 
         @app.post("/api/simulate", include_in_schema=False)
         async def trigger_simulation_demo(request: SimulateRequest):
-            nonlocal epsilon
+            nonlocal epsilon, attack_active, active_sim_id
             epsilon = request.epsilon
-            return await original_simulate(request)
+            attack_active = True
+            result = await original_simulate(request)
+            active_sim_id = result["sim_id"]
+            await ws_manager.broadcast(
+                {"type": "simulation_started", "data": result},
+                topic="state",
+            )
+            return result
+
+        @app.post("/api/simulate/stop")
+        async def stop_simulation():
+            nonlocal epsilon, attack_active, active_sim_id
+            stopped_id = active_sim_id
+            attack_active = False
+            active_sim_id = None
+            # epsilon decays naturally in the loop; snap to 0 immediately
+            epsilon = 0.0
+            await ws_manager.broadcast(
+                {
+                    "type": "simulation_stopped",
+                    "data": {"sim_id": stopped_id, "status": "stopped"},
+                },
+                topic="state",
+            )
+            return {"sim_id": stopped_id, "status": "stopped"}
+
+        @app.get("/api/simulate/status")
+        async def simulation_status():
+            return {
+                "active": attack_active,
+                "sim_id": active_sim_id,
+                "epsilon": epsilon,
+            }
 
     return app
 

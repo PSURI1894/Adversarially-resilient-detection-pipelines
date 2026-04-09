@@ -23,11 +23,13 @@ export const api = {
   getMetrics:  ()          => fetchJSON('/metrics'),
   getHistory:  (metric, limit=200) => fetchJSON(`/metrics/history?metric=${metric}&limit=${limit}`),
   getExplain:  (alertId)   => fetchJSON(`/explain/${alertId}`),
-  simulate:    (params)    => fetchJSON('/simulate', {
+  simulate:         (params) => fetchJSON('/simulate', {
     method: 'POST',
     body: JSON.stringify(params),
   }),
-  getConnections: ()       => fetchJSON('/connections'),
+  stopSimulation:   ()      => fetchJSON('/simulate/stop', { method: 'POST' }),
+  simulationStatus: ()      => fetchJSON('/simulate/status'),
+  getConnections:   ()      => fetchJSON('/connections'),
 };
 
 export function createWebSocket(onMessage) {

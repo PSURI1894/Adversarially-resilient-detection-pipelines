@@ -46,7 +46,7 @@ export default function App() {
   useEffect(() => {
     if (!lastMessage) return;
     if (lastMessage.type === 'alert') addAlert(lastMessage.data);
-    if (lastMessage.type === 'state_update') {
+    if (lastMessage.type === 'state' || lastMessage.type === 'state_update') {
       setStatus((prev) => prev ? { ...prev, ...lastMessage.data } : lastMessage.data);
     }
   }, [lastMessage, addAlert]);
@@ -121,7 +121,7 @@ export default function App() {
         />
       </div>
       <div className="span-4">
-        <AttackSimulator />
+        <AttackSimulator wsEvents={lastMessage} />
       </div>
     </div>
   );
