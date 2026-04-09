@@ -217,7 +217,7 @@ ssh -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" "ec2-user@$PUBLIC_IP" << 'R
 
   # Install docker if not present
   if ! command -v docker &>/dev/null; then
-    sudo yum install -y docker
+    sudo dnf install -y docker
     sudo systemctl start docker
     sudo usermod -aG docker ec2-user
   fi

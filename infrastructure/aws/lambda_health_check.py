@@ -107,7 +107,7 @@ def handler(event: Dict, context: Any) -> Dict[str, Any]:
 
     # ── 3. Drift state ────────────────────────────────────────
     try:
-        drift = _get("/api/drift/status") if "/drift" in (API_URL + "/api/drift/status") else {}
+        drift = _get("/api/drift/status")
         consensus = drift.get("consensus_state", "UNKNOWN")
         metrics["drift_elevated"] = 1.0 if consensus != "NORMAL" else 0.0
         if consensus == "CRISIS":

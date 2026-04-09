@@ -241,7 +241,7 @@ def run_streaming(model, conformal_engine, input_dim, feature_names, cfg, monito
     inf_service = RealtimeInferenceService(model, conformal_engine, input_dim=input_dim)
     feat_store = FeatureStore(redis_url=redis_url)
     drift_engine = ConceptDriftEngine(np.zeros((100, input_dim)))
-    retrainer = AdaptiveRetrainingPipeline(EnsembleOrchestrator(input_dim))
+    retrainer = AdaptiveRetrainingPipeline(EnsembleOrchestrator(EnsembleConfig(input_dim=input_dim)))
 
     logger.info("Streaming loop active. Listening for flows...")
 

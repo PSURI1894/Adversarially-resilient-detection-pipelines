@@ -1,0 +1,48 @@
+# Version control
+.git
+.gitignore
+
+# Python caches
+__pycache__
+*.pyc
+*.pyd
+*.pth
+*.egg-info
+
+# Virtual environments
+tf_env/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+dashboard/node_modules/
+dashboard/dist/
+
+# Data (large; mounted at runtime)
+data/raw/
+data/processed/
+
+# Secrets and keys
+infrastructure/aws/ardp-key.pem
+.env
+*.pem
+
+# Generated artefacts
+reports/
+mlruns/
+*.db
+*.log
+
+# Dev/test tooling
+tests/
+.pytest_cache/
+coverage.xml
+bandit-report.json
+
+# Claude Code
+.claude/
+
+# CI/CD
+.github/

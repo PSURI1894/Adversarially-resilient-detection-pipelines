@@ -35,37 +35,61 @@ jobs:
           chmod 400 ~/.ssh/ardp-key.pem
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Package and upload code
+        run: |
+          tar --exclude='./.git' --exclude='./data/raw' \
+              --exclude='./__pycache__' --exclude='./*.pyc' \
+              --exclude='./.venv' --exclude='./venv' --exclude='./tf_env' \
+              --exclude='./node_modules' --exclude='./dashboard/node_modules' \
+              --exclude='./infrastructure/aws/ardp-key.pem' \
+              --exclude='./*.db' --exclude='./mlflow.db' \
+              -czf /tmp/ardp-deploy.tar.gz .
+          scp -i ~/.ssh/ardp-key.pem /tmp/ardp-deploy.tar.gz \
+              ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/ardp-deploy.tar.gz
+
       - name: Deploy to EC2
         run: |
           ssh -i ~/.ssh/ardp-key.pem ec2-user@${{ secrets.EC2_HOST }} << 'REMOTE'
             set -e
-            cd /home/ec2-user/ardp
 
-            echo "Pulling latest code from GitHub..."
-            git fetch origin main
-            git reset --hard origin/main
+            echo "Extracting latest code..."
+            mkdir -p /home/ec2-user/ardp
+            tar -xzf /home/ec2-user/ardp-deploy.tar.gz -C /home/ec2-user/ardp/
+            rm -f /home/ec2-user/ardp-deploy.tar.gz
+
+            echo "Fixing permissions..."
+            mkdir -p /home/ec2-user/ardp/data/raw /home/ec2-user/ardp/data/processed
+            chmod -R 777 /home/ec2-user/ardp/data
 
             echo "Rebuilding and restarting containers..."
-            cp infrastructure/aws/docker-compose.prod.yml docker-compose.override.yml
-            docker compose up -d --build --remove-orphans
+            sudo docker compose \
+              --project-directory /home/ec2-user/ardp \
+              -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml \
+              up -d --build --remove-orphans
+
+            echo "Fixing mlruns volume permissions..."
+            sudo docker run --rm -v ardp_mlruns:/app/mlruns alpine chmod 777 /app/mlruns
 
             echo "Waiting for API to be healthy..."
-            for i in $(seq 1 12); do
+            for i in $(seq 1 18); do
               if curl -sf http://localhost:8000/api/status > /dev/null 2>&1; then
                 echo "API is healthy!"
                 break
               fi
-              echo "Waiting... attempt $i/12"
+              echo "Waiting... attempt $i/18"
               sleep 10
             done
 
             echo "Deployment complete!"
-            docker compose ps
+            sudo docker compose \
+              --project-directory /home/ec2-user/ardp \
+              -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml \
+              ps
           REMOTE
 
       - name: Verify deployment
         run: |
           sleep 5
-          curl -sf http://${{ secrets.EC2_HOST }}:8000/api/status \
+          curl -sf http://${{ secrets.EC2_HOST }}/api/status \
             && echo "Deployment verified successfully" \
             || echo "::warning::API health check failed — check EC2 logs"

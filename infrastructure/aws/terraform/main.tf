@@ -27,6 +27,10 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -110,9 +114,9 @@ resource "aws_instance" "backend" {
   vpc_security_group_ids = [aws_security_group.ardp.id]
   user_data              = file("${path.module}/../ec2_userdata.sh")
 
-  # t2.micro root volume (8 GB — fits within free tier)
+  # 20 GB root volume — 8 GB is insufficient for Docker images
   root_block_device {
-    volume_size           = 8
+    volume_size           = 20
     volume_type           = "gp2"
     delete_on_termination = true
   }
