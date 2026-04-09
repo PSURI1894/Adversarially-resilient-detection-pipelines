@@ -51,10 +51,12 @@ export default function AttackSimulator({ wsEvents }) {
   };
 
   // ── finish an attack and push to history ───────────────────
-  const finishAttack = (attack, how) => {
-    const elapsed = startedAtRef.current
-      ? Math.round((Date.now() - startedAtRef.current) / 1000)
-      : attack?.duration_seconds ?? 0;
+  const finishAttack = (attack, how, serverElapsed = null) => {
+    const elapsed = serverElapsed !== null
+      ? serverElapsed
+      : startedAtRef.current
+        ? Math.round((Date.now() - startedAtRef.current) / 1000)
+        : attack?.duration_seconds ?? 0;
 
     setHistory((prev) => [
       {
@@ -83,7 +85,11 @@ export default function AttackSimulator({ wsEvents }) {
       if (!countdownRef.current && wsEvents.data.duration_seconds)
         startCountdown(wsEvents.data.duration_seconds);
     } else if (wsEvents.type === 'simulation_stopped') {
-      finishAttack(activeAttack, wsEvents.data.status === 'completed' ? 'completed' : 'stopped');
+      finishAttack(
+        activeAttack,
+        wsEvents.data.status === 'completed' ? 'completed' : 'stopped',
+        wsEvents.data.elapsed_seconds ?? null,
+      );
     }
   }, [wsEvents]);
 
@@ -103,7 +109,11 @@ export default function AttackSimulator({ wsEvents }) {
     if (!activeAttack) return;
     const id = setInterval(() => {
       api.simulationStatus?.().then((s) => {
-        if (!s?.active) finishAttack(activeAttack, 'completed');
+        if (!s?.active) {
+          // Use server-elapsed if provided; otherwise wall-clock via startedAtRef
+          const serverElapsed = (s?.elapsed_seconds != null) ? s.elapsed_seconds : null;
+          finishAttack(activeAttack, 'completed', serverElapsed);
+        }
       }).catch(() => {});
     }, 2000);
     return () => clearInterval(id);

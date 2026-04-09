@@ -430,13 +430,14 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             nonlocal epsilon, attack_active, active_sim_id
             if active_sim_id != sim_id:
                 return  # already stopped manually or replaced by a new attack
+            elapsed = round(time.time() - attack_start_time) if attack_start_time else round(delay)
             attack_active = False
             active_sim_id = None
             epsilon = 0.0
             await ws_manager.broadcast(
                 {
                     "type": "simulation_stopped",
-                    "data": {"sim_id": sim_id, "status": "completed"},
+                    "data": {"sim_id": sim_id, "status": "completed", "elapsed_seconds": elapsed},
                 },
                 topic="state",
             )
@@ -464,6 +465,7 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         async def stop_simulation():
             nonlocal epsilon, attack_active, active_sim_id
             stopped_id = active_sim_id
+            elapsed = round(time.time() - attack_start_time) if attack_active and attack_start_time else 0
             attack_active = False
             active_sim_id = None
             # epsilon decays naturally in the loop; snap to 0 immediately
@@ -471,15 +473,15 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             await ws_manager.broadcast(
                 {
                     "type": "simulation_stopped",
-                    "data": {"sim_id": stopped_id, "status": "stopped"},
+                    "data": {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed},
                 },
                 topic="state",
             )
-            return {"sim_id": stopped_id, "status": "stopped"}
+            return {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}
 
         @app.get("/api/simulate/status")
         async def simulation_status():
-            elapsed = time.time() - attack_start_time if attack_active else 0
+            elapsed = time.time() - attack_start_time if attack_start_time else 0
             time_remaining = max(0, round(attack_duration - elapsed)) if attack_active else 0
             return {
                 "active": attack_active,
@@ -487,6 +489,7 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 "epsilon": epsilon,
                 "time_remaining": time_remaining,
                 "duration_seconds": round(attack_duration),
+                "elapsed_seconds": round(elapsed) if not attack_active else None,
             }
 
     return app
