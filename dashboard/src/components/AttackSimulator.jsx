@@ -2,7 +2,7 @@
    ATTACK SIMULATOR — INTERACTIVE ADVERSARIAL ATTACK CONTROLS
    ============================================================================== */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { colors } from '../utils/theme';
 import { api } from '../services/api';
 
@@ -21,18 +21,41 @@ export default function AttackSimulator({ wsEvents }) {
   const [attackType, setAttackType] = useState('pgd');
   const [epsilon, setEpsilon] = useState(0.1);
   const [nSamples, setNSamples] = useState(1000);
-  const [busy, setBusy] = useState(false);          // API call in flight
-  const [activeAttack, setActiveAttack] = useState(null);  // { sim_id, attack_type, epsilon }
+  const [busy, setBusy] = useState(false);
+  const [activeAttack, setActiveAttack] = useState(null);  // { sim_id, attack_type, epsilon, duration_seconds }
   const [lastResult, setLastResult] = useState(null);
+  const [countdown, setCountdown] = useState(null);
+  const countdownRef = useRef(null);
+
+  const startCountdown = (seconds) => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setCountdown(seconds);
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) { clearInterval(countdownRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const clearCountdown = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setCountdown(null);
+  };
 
   // Sync with WebSocket events from parent (simulation_started / simulation_stopped)
   useEffect(() => {
     if (!wsEvents) return;
     if (wsEvents.type === 'simulation_started') {
       setActiveAttack(wsEvents.data);
+      if (wsEvents.data.duration_seconds) startCountdown(wsEvents.data.duration_seconds);
     } else if (wsEvents.type === 'simulation_stopped') {
       setActiveAttack(null);
-      setLastResult({ status: 'stopped', sim_id: wsEvents.data.sim_id });
+      clearCountdown();
+      setLastResult({
+        status: wsEvents.data.status === 'completed' ? 'completed' : 'stopped',
+        sim_id: wsEvents.data.sim_id,
+      });
     }
   }, [wsEvents]);
 
@@ -46,10 +69,11 @@ export default function AttackSimulator({ wsEvents }) {
   const handleLaunch = async () => {
     setBusy(true);
     setLastResult(null);
+    clearCountdown();
     try {
       const res = await api.simulate({ attack_type: attackType, epsilon, n_samples: nSamples });
       setActiveAttack(res);
-      setLastResult({ status: 'started', ...res });
+      if (res.duration_seconds) startCountdown(res.duration_seconds);
     } catch (err) {
       setLastResult({ status: 'error', message: err.message });
     }
@@ -58,6 +82,7 @@ export default function AttackSimulator({ wsEvents }) {
 
   const handleStop = async () => {
     setBusy(true);
+    clearCountdown();
     try {
       const res = await api.stopSimulation();
       setActiveAttack(null);
@@ -167,10 +192,30 @@ export default function AttackSimulator({ wsEvents }) {
             background: 'rgba(255,80,80,0.08)',
             border: '1px solid rgba(255,80,80,0.3)',
           }}>
-            <div style={{ color: colors.red }}>▶ Attack in progress</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: colors.red }}>▶ Attack in progress</span>
+              {countdown !== null && (
+                <span style={{
+                  color: countdown <= 5 ? colors.red : 'var(--amber)',
+                  fontWeight: 700, fontSize: 12,
+                }}>
+                  {countdown}s
+                </span>
+              )}
+            </div>
             <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
               id={activeAttack.sim_id} | {activeAttack.attack_type || attackType} | eps={activeAttack.epsilon ?? epsilon}
             </div>
+            {countdown !== null && (
+              <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)' }}>
+                <div style={{
+                  height: '100%', borderRadius: 2,
+                  background: countdown <= 5 ? colors.red : colors.amber,
+                  width: `${(countdown / (activeAttack.duration_seconds || countdown)) * 100}%`,
+                  transition: 'width 1s linear',
+                }} />
+              </div>
+            )}
           </div>
         )}
 
@@ -192,9 +237,11 @@ export default function AttackSimulator({ wsEvents }) {
             {lastResult.status === 'error' && (
               <span style={{ color: colors.red }}>Error: {lastResult.message}</span>
             )}
-            {lastResult.status === 'stopped' && (
+            {(lastResult.status === 'stopped' || lastResult.status === 'completed') && (
               <>
-                <div style={{ color: 'var(--text-muted)' }}>⬛ Attack stopped</div>
+                <div style={{ color: 'var(--text-muted)' }}>
+                  {lastResult.status === 'completed' ? '✓ Attack completed' : '⬛ Attack stopped'}
+                </div>
                 <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
                   id={lastResult.sim_id} — severity decaying
                 </div>

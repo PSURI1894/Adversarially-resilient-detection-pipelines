@@ -422,6 +422,23 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
         original_simulate = trigger_simulation
 
+        async def _auto_stop(sim_id: str, delay: float):
+            """Broadcast simulation_stopped after `delay` seconds."""
+            await asyncio.sleep(delay)
+            nonlocal epsilon, attack_active, active_sim_id
+            if active_sim_id != sim_id:
+                return  # already stopped manually or replaced by a new attack
+            attack_active = False
+            active_sim_id = None
+            epsilon = 0.0
+            await ws_manager.broadcast(
+                {
+                    "type": "simulation_stopped",
+                    "data": {"sim_id": sim_id, "status": "completed"},
+                },
+                topic="state",
+            )
+
         @app.post("/api/simulate", include_in_schema=False)
         async def trigger_simulation_demo(request: SimulateRequest):
             nonlocal epsilon, attack_active, active_sim_id
@@ -433,6 +450,10 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 {"type": "simulation_started", "data": result},
                 topic="state",
             )
+            # Auto-stop: 2 ms per sample, minimum 10 s, maximum 120 s
+            duration = max(10.0, min(request.n_samples * 0.002, 120.0))
+            asyncio.create_task(_auto_stop(result["sim_id"], duration))
+            result["duration_seconds"] = round(duration)
             return result
 
         @app.post("/api/simulate/stop")
