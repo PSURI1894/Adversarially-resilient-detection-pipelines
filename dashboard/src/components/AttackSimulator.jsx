@@ -36,7 +36,6 @@ export default function AttackSimulator({ wsEvents }) {
   // ── countdown helpers ──────────────────────────────────────
   const startCountdown = (seconds) => {
     if (countdownRef.current) clearInterval(countdownRef.current);
-    startedAtRef.current = Date.now() - ((activeAttack?.duration_seconds ?? seconds) - seconds) * 1000;
     setCountdown(seconds);
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
@@ -77,9 +76,12 @@ export default function AttackSimulator({ wsEvents }) {
   useEffect(() => {
     if (!wsEvents) return;
     if (wsEvents.type === 'simulation_started') {
-      startedAtRef.current = Date.now();
-      setActiveAttack(wsEvents.data);
-      if (wsEvents.data.duration_seconds) startCountdown(wsEvents.data.duration_seconds);
+      // Only set startedAt if not already tracking (REST response sets it first)
+      if (!startedAtRef.current) startedAtRef.current = Date.now();
+      // Keep REST-fetched activeAttack (has duration_seconds); WS payload lacks it
+      setActiveAttack((prev) => prev ?? wsEvents.data);
+      if (!countdownRef.current && wsEvents.data.duration_seconds)
+        startCountdown(wsEvents.data.duration_seconds);
     } else if (wsEvents.type === 'simulation_stopped') {
       finishAttack(activeAttack, wsEvents.data.status === 'completed' ? 'completed' : 'stopped');
     }
