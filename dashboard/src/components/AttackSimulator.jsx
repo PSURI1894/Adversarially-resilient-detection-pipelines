@@ -7,28 +7,36 @@ import { colors } from '../utils/theme';
 import { api } from '../services/api';
 
 const ATTACK_TYPES = [
-  { value: 'pgd', label: 'PGD (White-box)' },
-  { value: 'carlini_wagner', label: 'C&W L2' },
-  { value: 'auto_attack', label: 'AutoAttack' },
-  { value: 'boundary', label: 'Boundary (Black-box)' },
+  { value: 'pgd',                 label: 'PGD (White-box)' },
+  { value: 'carlini_wagner',      label: 'C&W L2' },
+  { value: 'auto_attack',         label: 'AutoAttack' },
+  { value: 'boundary',            label: 'Boundary (Black-box)' },
   { value: 'feature_constrained', label: 'Feature Constrained' },
-  { value: 'slow_drip', label: 'Slow Drip' },
-  { value: 'label_flip', label: 'Label Flip Poison' },
-  { value: 'calibration', label: 'Calibration Poison' },
+  { value: 'slow_drip',           label: 'Slow Drip' },
+  { value: 'label_flip',          label: 'Label Flip Poison' },
+  { value: 'calibration',         label: 'Calibration Poison' },
 ];
 
-export default function AttackSimulator({ wsEvents }) {
-  const [attackType, setAttackType] = useState('pgd');
-  const [epsilon, setEpsilon] = useState(0.1);
-  const [nSamples, setNSamples] = useState(1000);
-  const [busy, setBusy] = useState(false);
-  const [activeAttack, setActiveAttack] = useState(null);  // { sim_id, attack_type, epsilon, duration_seconds }
-  const [lastResult, setLastResult] = useState(null);
-  const [countdown, setCountdown] = useState(null);
-  const countdownRef = useRef(null);
+function fmt(sec) {
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+}
 
+export default function AttackSimulator({ wsEvents }) {
+  const [attackType, setAttackType]   = useState('pgd');
+  const [epsilon, setEpsilon]         = useState(0.1);
+  const [nSamples, setNSamples]       = useState(1000);
+  const [busy, setBusy]               = useState(false);
+  const [activeAttack, setActiveAttack] = useState(null);
+  const [countdown, setCountdown]     = useState(null);
+  const [history, setHistory]         = useState([]);   // completed attack log
+  const countdownRef  = useRef(null);
+  const startedAtRef  = useRef(null);  // wall-clock when attack started
+
+  // ── countdown helpers ──────────────────────────────────────
   const startCountdown = (seconds) => {
     if (countdownRef.current) clearInterval(countdownRef.current);
+    startedAtRef.current = Date.now() - ((activeAttack?.duration_seconds ?? seconds) - seconds) * 1000;
     setCountdown(seconds);
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
@@ -43,71 +51,83 @@ export default function AttackSimulator({ wsEvents }) {
     setCountdown(null);
   };
 
-  // Sync with WebSocket events from parent (simulation_started / simulation_stopped)
+  // ── finish an attack and push to history ───────────────────
+  const finishAttack = (attack, how) => {
+    const elapsed = startedAtRef.current
+      ? Math.round((Date.now() - startedAtRef.current) / 1000)
+      : attack?.duration_seconds ?? 0;
+
+    setHistory((prev) => [
+      {
+        sim_id:       attack?.sim_id,
+        attack_type:  attack?.attack_type ?? attackType,
+        epsilon:      attack?.epsilon ?? epsilon,
+        duration:     elapsed,
+        ended:        how,          // 'completed' | 'stopped'
+        at:           new Date().toLocaleTimeString('en-GB', { hour12: false }),
+      },
+      ...prev.slice(0, 4),          // keep last 5
+    ]);
+    setActiveAttack(null);
+    clearCountdown();
+    startedAtRef.current = null;
+  };
+
+  // ── WebSocket events ───────────────────────────────────────
   useEffect(() => {
     if (!wsEvents) return;
     if (wsEvents.type === 'simulation_started') {
+      startedAtRef.current = Date.now();
       setActiveAttack(wsEvents.data);
       if (wsEvents.data.duration_seconds) startCountdown(wsEvents.data.duration_seconds);
     } else if (wsEvents.type === 'simulation_stopped') {
-      setActiveAttack(null);
-      clearCountdown();
-      setLastResult({
-        status: wsEvents.data.status === 'completed' ? 'completed' : 'stopped',
-        sim_id: wsEvents.data.sim_id,
-      });
+      finishAttack(activeAttack, wsEvents.data.status === 'completed' ? 'completed' : 'stopped');
     }
   }, [wsEvents]);
 
-  // On mount: restore state if attack is already running
+  // ── restore state on page load ─────────────────────────────
   useEffect(() => {
     api.simulationStatus?.().then((s) => {
       if (s?.active) {
+        startedAtRef.current = Date.now() - (s.duration_seconds - s.time_remaining) * 1000;
         setActiveAttack({ sim_id: s.sim_id, epsilon: s.epsilon, duration_seconds: s.duration_seconds });
         if (s.time_remaining > 0) startCountdown(s.time_remaining);
       }
     }).catch(() => {});
   }, []);
 
-  // Poll every 2 s while active — self-corrects even if WS event was missed
+  // ── poll while active (self-corrects if WS event missed) ──
   useEffect(() => {
     if (!activeAttack) return;
     const id = setInterval(() => {
       api.simulationStatus?.().then((s) => {
-        if (!s?.active) {
-          setActiveAttack(null);
-          clearCountdown();
-          setLastResult({ status: 'completed', sim_id: activeAttack?.sim_id });
-        }
+        if (!s?.active) finishAttack(activeAttack, 'completed');
       }).catch(() => {});
     }, 2000);
     return () => clearInterval(id);
   }, [activeAttack]);
 
+  // ── launch / stop handlers ─────────────────────────────────
   const handleLaunch = async () => {
     setBusy(true);
-    setLastResult(null);
     clearCountdown();
     try {
       const res = await api.simulate({ attack_type: attackType, epsilon, n_samples: nSamples });
+      startedAtRef.current = Date.now();
       setActiveAttack(res);
       if (res.duration_seconds) startCountdown(res.duration_seconds);
     } catch (err) {
-      setLastResult({ status: 'error', message: err.message });
+      setHistory((prev) => [{ error: err.message, at: new Date().toLocaleTimeString() }, ...prev.slice(0, 4)]);
     }
     setBusy(false);
   };
 
   const handleStop = async () => {
     setBusy(true);
-    clearCountdown();
     try {
-      const res = await api.stopSimulation();
-      setActiveAttack(null);
-      setLastResult({ status: 'stopped', sim_id: res.sim_id });
-    } catch (err) {
-      setLastResult({ status: 'error', message: err.message });
-    }
+      await api.stopSimulation();
+      finishAttack(activeAttack, 'stopped');
+    } catch (err) { /* ignore */ }
     setBusy(false);
   };
 
@@ -119,90 +139,59 @@ export default function AttackSimulator({ wsEvents }) {
         <span>Attack Simulator</span>
         {isRunning && <span className="badge badge-warning pulse">ACTIVE</span>}
       </div>
-      <div className="glass-panel-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="glass-panel-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
 
-        {/* Attack type */}
+        {/* Controls */}
         <div>
-          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-            ATTACK TYPE
-          </label>
+          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>ATTACK TYPE</label>
           <select value={attackType} onChange={(e) => setAttackType(e.target.value)}
-            disabled={isRunning}
-            style={{ width: '100%', opacity: isRunning ? 0.5 : 1 }}>
-            {ATTACK_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
+            disabled={isRunning} style={{ width: '100%', opacity: isRunning ? 0.5 : 1 }}>
+            {ATTACK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
 
-        {/* Epsilon */}
         <div>
           <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-            EPSILON:{' '}
-            <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>
-              {epsilon.toFixed(2)}
-            </span>
+            EPSILON: <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>{epsilon.toFixed(2)}</span>
           </label>
-          <input
-            type="range"
-            className="input-range"
-            min="0" max="0.5" step="0.01"
-            value={epsilon}
-            disabled={isRunning}
+          <input type="range" className="input-range" min="0" max="0.5" step="0.01"
+            value={epsilon} disabled={isRunning}
             onChange={(e) => setEpsilon(parseFloat(e.target.value))}
-            style={{ opacity: isRunning ? 0.5 : 1 }}
-          />
+            style={{ opacity: isRunning ? 0.5 : 1 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
             <span>0.00</span><span>0.25</span><span>0.50</span>
           </div>
         </div>
 
-        {/* Samples */}
         <div>
-          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-            SAMPLES
-          </label>
-          <input
-            type="number"
-            value={nSamples}
+          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>SAMPLES</label>
+          <input type="number" value={nSamples}
             onChange={(e) => setNSamples(parseInt(e.target.value) || 100)}
-            min={100} max={50000} step={100}
-            disabled={isRunning}
-            style={{ width: '100%', opacity: isRunning ? 0.5 : 1 }}
-          />
+            min={100} max={50000} step={100} disabled={isRunning}
+            style={{ width: '100%', opacity: isRunning ? 0.5 : 1 }} />
         </div>
 
-        {/* Launch / Stop button */}
+        {/* Button */}
         {isRunning ? (
-          <button
-            className="btn"
-            onClick={handleStop}
-            disabled={busy}
-            style={{
-              width: '100%', justifyContent: 'center', padding: '10px 0',
-              fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
-              background: 'var(--red-dim)',
-              border: '1px solid var(--red)',
-              color: 'var(--red)',
-              opacity: busy ? 0.5 : 1,
-            }}>
+          <button className="btn" onClick={handleStop} disabled={busy} style={{
+            width: '100%', justifyContent: 'center', padding: '10px 0',
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+            background: 'var(--red-dim)', border: '1px solid var(--red)',
+            color: 'var(--red)', opacity: busy ? 0.5 : 1,
+          }}>
             {busy ? 'STOPPING...' : '⬛ STOP ATTACK'}
           </button>
         ) : (
-          <button
-            className="btn btn-danger"
-            onClick={handleLaunch}
-            disabled={busy}
-            style={{
-              width: '100%', justifyContent: 'center', padding: '10px 0',
-              fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
-              opacity: busy ? 0.5 : 1,
-            }}>
+          <button className="btn btn-danger" onClick={handleLaunch} disabled={busy} style={{
+            width: '100%', justifyContent: 'center', padding: '10px 0',
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+            opacity: busy ? 0.5 : 1,
+          }}>
             {busy ? 'LAUNCHING...' : 'LAUNCH ATTACK'}
           </button>
         )}
 
-        {/* Status card */}
+        {/* Active attack card with countdown */}
         {isRunning && (
           <div style={{
             padding: 10, borderRadius: 8, fontSize: 10,
@@ -213,23 +202,20 @@ export default function AttackSimulator({ wsEvents }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: colors.red }}>▶ Attack in progress</span>
               {countdown !== null && (
-                <span style={{
-                  color: countdown <= 5 ? colors.red : 'var(--amber)',
-                  fontWeight: 700, fontSize: 12,
-                }}>
-                  {countdown}s
+                <span style={{ color: countdown <= 5 ? colors.red : 'var(--amber)', fontWeight: 700, fontSize: 12 }}>
+                  {fmt(countdown)} left
                 </span>
               )}
             </div>
             <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
-              id={activeAttack.sim_id} | {activeAttack.attack_type || attackType} | eps={activeAttack.epsilon ?? epsilon}
+              {activeAttack.attack_type || attackType} | eps={activeAttack.epsilon ?? epsilon} | id={activeAttack.sim_id}
             </div>
-            {countdown !== null && (
+            {countdown !== null && activeAttack.duration_seconds && (
               <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)' }}>
                 <div style={{
                   height: '100%', borderRadius: 2,
                   background: countdown <= 5 ? colors.red : colors.amber,
-                  width: `${(countdown / (activeAttack.duration_seconds || countdown)) * 100}%`,
+                  width: `${(countdown / activeAttack.duration_seconds) * 100}%`,
                   transition: 'width 1s linear',
                 }} />
               </div>
@@ -237,42 +223,37 @@ export default function AttackSimulator({ wsEvents }) {
           </div>
         )}
 
-        {/* Result message (stopped / error) */}
-        {!isRunning && lastResult && (
-          <div style={{
-            padding: 10, borderRadius: 8, fontSize: 10,
-            fontFamily: 'var(--font-mono)',
-            background: lastResult.status === 'error'
-              ? 'var(--red-dim)'
-              : lastResult.status === 'stopped'
-              ? 'rgba(100,100,120,0.2)'
-              : 'var(--cyan-dim)',
-            border: `1px solid ${
-              lastResult.status === 'error' ? colors.red
-              : lastResult.status === 'stopped' ? 'rgba(150,150,170,0.4)'
-              : colors.cyan}33`,
-          }}>
-            {lastResult.status === 'error' && (
-              <span style={{ color: colors.red }}>Error: {lastResult.message}</span>
-            )}
-            {(lastResult.status === 'stopped' || lastResult.status === 'completed') && (
-              <>
-                <div style={{ color: 'var(--text-muted)' }}>
-                  {lastResult.status === 'completed' ? '✓ Attack completed' : '⬛ Attack stopped'}
+        {/* Attack history log */}
+        {history.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.06em' }}>
+              ATTACK LOG
+            </div>
+            {history.map((h, i) => h.error ? (
+              <div key={i} style={{ fontSize: 10, color: colors.red, fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                ✕ {h.error}
+              </div>
+            ) : (
+              <div key={i} style={{
+                padding: '6px 8px', borderRadius: 6, marginBottom: 4,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: h.ended === 'completed' ? colors.green : colors.amber }}>
+                    {h.ended === 'completed' ? '✓ Completed' : '⬛ Stopped'}
+                  </span>
+                  <span style={{ color: 'var(--text-muted)' }}>{h.at}</span>
                 </div>
-                <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
-                  id={lastResult.sim_id} — severity decaying
+                <div style={{ color: 'var(--text-secondary)', marginTop: 3 }}>
+                  {h.attack_type} | ε={h.epsilon} | <span style={{ color: 'var(--cyan)' }}>{fmt(h.duration)}</span>
                 </div>
-              </>
-            )}
-            {lastResult.status === 'started' && (
-              <>
-                <div style={{ color: colors.cyan }}>Simulation #{lastResult.sim_id} started</div>
-                <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
-                  {lastResult.attack_type} | eps={lastResult.epsilon} | n={lastResult.n_samples}
+                <div style={{ color: 'var(--text-muted)', marginTop: 1, fontSize: 9 }}>
+                  id={h.sim_id}
                 </div>
-              </>
-            )}
+              </div>
+            ))}
           </div>
         )}
 
