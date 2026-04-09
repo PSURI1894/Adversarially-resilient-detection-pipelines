@@ -52,10 +52,14 @@ export default function AttackSimulator({ wsEvents }) {
 
   // ── finish an attack and push to history ───────────────────
   const finishAttack = (attack, how, serverElapsed = null) => {
-    const elapsed = serverElapsed !== null
+    const wallClock = startedAtRef.current
+      ? Math.round((Date.now() - startedAtRef.current) / 1000)
+      : null;
+    // Prefer server-reported elapsed when it's > 0; fall back to wall-clock
+    const elapsed = (serverElapsed != null && serverElapsed > 0)
       ? serverElapsed
-      : startedAtRef.current
-        ? Math.round((Date.now() - startedAtRef.current) / 1000)
+      : (wallClock != null && wallClock > 0)
+        ? wallClock
         : attack?.duration_seconds ?? 0;
 
     setHistory((prev) => [

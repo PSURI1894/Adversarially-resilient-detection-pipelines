@@ -424,13 +424,13 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
         original_simulate = trigger_simulation
 
-        async def _auto_stop(sim_id: str, delay: float):
+        async def _auto_stop(sim_id: str, delay: float, started_at: float):
             """Broadcast simulation_stopped after `delay` seconds."""
             await asyncio.sleep(delay)
             nonlocal epsilon, attack_active, active_sim_id
             if active_sim_id != sim_id:
                 return  # already stopped manually or replaced by a new attack
-            elapsed = round(time.time() - attack_start_time) if attack_start_time else round(delay)
+            elapsed = round(time.time() - started_at)
             attack_active = False
             active_sim_id = None
             epsilon = 0.0
@@ -457,13 +457,13 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             # Auto-stop: 2 ms per sample, minimum 10 s, maximum 120 s
             duration = max(10.0, min(request.n_samples * 0.002, 120.0))
             attack_duration = duration
-            asyncio.create_task(_auto_stop(result["sim_id"], duration))
+            asyncio.create_task(_auto_stop(result["sim_id"], duration, attack_start_time))
             result["duration_seconds"] = round(duration)
             return result
 
         @app.post("/api/simulate/stop")
         async def stop_simulation():
-            nonlocal epsilon, attack_active, active_sim_id
+            nonlocal epsilon, attack_active, active_sim_id, attack_start_time
             stopped_id = active_sim_id
             elapsed = round(time.time() - attack_start_time) if attack_active and attack_start_time else 0
             attack_active = False
