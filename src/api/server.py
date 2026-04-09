@@ -249,63 +249,8 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             "top_features": alert.get("top_features", []),
         }
 
-    @app.post("/api/simulate")
-    async def trigger_simulation(request: SimulateRequest):
-        """Trigger an adversarial simulation with given parameters."""
-        sim_id = uuid.uuid4().hex[:8]
-
-        # Notify connected clients
-        await ws_manager.broadcast(
-            {
-                "type": "simulation_started",
-                "data": {
-                    "sim_id": sim_id,
-                    "attack_type": request.attack_type,
-                    "epsilon": request.epsilon,
-                    "n_samples": request.n_samples,
-                },
-            },
-            topic="state",
-        )
-
-        return {
-            "sim_id": sim_id,
-            "status": "started",
-            "attack_type": request.attack_type,
-            "epsilon": request.epsilon,
-            "n_samples": request.n_samples,
-        }
-
-    @app.get("/api/connections")
-    async def get_connections():
-        """WebSocket connection pool statistics."""
-        return ws_manager.get_connection_stats()
-
     # ------------------------------------------------------------------
-    # WebSocket Endpoint
-    # ------------------------------------------------------------------
-
-    @app.websocket("/ws/live")
-    async def websocket_endpoint(websocket: WebSocket):
-        client_id = uuid.uuid4().hex[:8]
-        await ws_manager.connect(websocket, client_id)
-
-        try:
-            while True:
-                data = await websocket.receive_text()
-                await ws_manager.handle_client_message(client_id, data)
-        except WebSocketDisconnect:
-            await ws_manager.disconnect(client_id)
-
-    # ------------------------------------------------------------------
-    # Expose shared state and manager for pipeline integration
-    # ------------------------------------------------------------------
-
-    app.state.pipeline = state
-    app.state.ws_manager = ws_manager
-
-    # ------------------------------------------------------------------
-    # Demo mode: continuous synthetic data generator
+    # Demo / simulation state (shared closure vars)
     # ------------------------------------------------------------------
 
     DEMO_MODE = os.environ.get("ARDP_MODE", "demo") == "demo"
@@ -316,27 +261,27 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         "psh_flag_cnt", "ack_flag_cnt", "init_fwd_win_byts",
     ]
 
-    epsilon = 0.0        # attack strength; updated by /api/simulate
-    attack_active = False  # True while a simulation is running
-    demo_mode_active = False  # True when background synthetic data is enabled
+    epsilon: float = 0.0
+    attack_active: bool = False
+    demo_mode_active: bool = False
     active_sim_id: Optional[str] = None
     attack_start_time: float = 0.0
     attack_duration: float = 0.0
 
+    # ------------------------------------------------------------------
+    # Background data loop (runs when attack OR demo mode is active)
+    # ------------------------------------------------------------------
+
     async def _demo_loop():
-        """Push synthetic alerts and metrics every ~2 s when active."""
         nonlocal epsilon, attack_active, demo_mode_active
         tick = 0
-
         while True:
             await asyncio.sleep(2)
             tick += 1
             t = time.time()
 
-            generating = attack_active or demo_mode_active
-
-            if not generating:
-                # Idle: broadcast a quiet STABLE state so the dashboard stays fresh
+            if not (attack_active or demo_mode_active):
+                # Idle — reset state and notify dashboard
                 state.soc_state = "STABLE"
                 state.severity = 0.0
                 state.alert_debt = 0.0
@@ -352,29 +297,19 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 )
                 continue
 
-            # ── Active: generate synthetic data ───────────────────────────
+            # Active — generate synthetic alert data
             if attack_active:
-                # Attack: severity driven by epsilon, high noise
-                severity = min(1.0, 0.55 + epsilon * 2.5 + random.uniform(-0.05, 0.1))
+                severity = min(1.0, 0.6 + epsilon * 2.5 + random.uniform(-0.05, 0.1))
             else:
-                # Demo background: sine-wave severity cycle
                 phase = (tick % 60) / 60.0
                 severity = min(1.0, max(0.0,
                     0.3 + 0.7 * abs(math.sin(math.pi * phase)) + random.uniform(-0.05, 0.05)
                 ))
 
-            if severity > 0.75:
-                soc_state = "CRISIS"
-            elif severity > 0.45:
-                soc_state = "ELEVATED"
-            else:
-                soc_state = "STABLE"
-
-            alert_debt = severity * 80 + random.uniform(-5, 5)
-
+            soc_state = "CRISIS" if severity > 0.75 else "ELEVATED" if severity > 0.45 else "STABLE"
             state.soc_state = soc_state
             state.severity = round(severity, 3)
-            state.alert_debt = round(max(0, alert_debt), 1)
+            state.alert_debt = round(max(0, severity * 80 + random.uniform(-5, 5)), 1)
             state.calibration_drift = round(random.uniform(0, 0.12) * max(epsilon, 0.05) * 5, 3)
             state.disagreement = round(random.uniform(0.0, 0.3) * severity, 3)
             state.n_evaluations += random.randint(80, 150)
@@ -405,13 +340,10 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 ],
             }
             state.push_alert(alert)
-
             state.uncertainty_history.append(round(random.uniform(0.1, 0.9) * severity, 3))
             state.severity_history.append(round(severity, 3))
             state.latency_history.append(alert["latency_ms"])
-
-            f1 = round(max(0, 1 - severity * 0.6 + random.uniform(-0.05, 0.05)), 3)
-            state.f1_history.append({"timestamp": t, "value": f1})
+            state.f1_history.append({"timestamp": t, "value": round(max(0, 1 - severity * 0.6 + random.uniform(-0.05, 0.05)), 3)})
             state.fdr_history.append({"timestamp": t, "value": round(severity * 0.4 + random.uniform(0, 0.1), 3)})
             state.auc_history.append({"timestamp": t, "value": round(max(0.5, 1 - severity * 0.3), 3)})
             state.set_size_history.append({"timestamp": t, "value": round(1 + severity, 2)})
@@ -429,96 +361,130 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 topic="state",
             )
 
+    async def _auto_stop(sim_id: str, delay: float, started_at: float):
+        await asyncio.sleep(delay)
+        nonlocal epsilon, attack_active, active_sim_id
+        if active_sim_id != sim_id:
+            return
+        elapsed = round(time.time() - started_at)
+        attack_active = False
+        active_sim_id = None
+        epsilon = 0.0
+        await ws_manager.broadcast(
+            {"type": "simulation_stopped",
+             "data": {"sim_id": sim_id, "status": "completed", "elapsed_seconds": elapsed}},
+            topic="state",
+        )
+
+    # ------------------------------------------------------------------
+    # Single /api/simulate route (handles demo state internally)
+    # ------------------------------------------------------------------
+
+    @app.post("/api/simulate")
+    async def trigger_simulation(request: SimulateRequest):
+        nonlocal epsilon, attack_active, active_sim_id, attack_start_time, attack_duration
+        sim_id = uuid.uuid4().hex[:8]
+
+        if DEMO_MODE:
+            epsilon = request.epsilon
+            attack_active = True
+            attack_start_time = time.time()
+            active_sim_id = sim_id
+            # 30–40 s for 1 000 samples; scales up to 120 s max
+            duration = max(30.0, min(request.n_samples * 0.04, 120.0))
+            attack_duration = duration
+            asyncio.create_task(_auto_stop(sim_id, duration, attack_start_time))
+
+        result = {
+            "sim_id": sim_id,
+            "status": "started",
+            "attack_type": request.attack_type,
+            "epsilon": request.epsilon,
+            "n_samples": request.n_samples,
+        }
+        if DEMO_MODE:
+            result["duration_seconds"] = round(duration)
+
+        await ws_manager.broadcast(
+            {"type": "simulation_started", "data": result},
+            topic="state",
+        )
+        return result
+
+    @app.post("/api/simulate/stop")
+    async def stop_simulation():
+        nonlocal epsilon, attack_active, active_sim_id, attack_start_time
+        stopped_id = active_sim_id
+        elapsed = round(time.time() - attack_start_time) if attack_active and attack_start_time else 0
+        attack_active = False
+        active_sim_id = None
+        epsilon = 0.0
+        await ws_manager.broadcast(
+            {"type": "simulation_stopped",
+             "data": {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}},
+            topic="state",
+        )
+        return {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}
+
+    @app.get("/api/simulate/status")
+    async def simulation_status():
+        elapsed = time.time() - attack_start_time if attack_start_time else 0
+        time_remaining = max(0, round(attack_duration - elapsed)) if attack_active else 0
+        return {
+            "active": attack_active,
+            "sim_id": active_sim_id,
+            "epsilon": epsilon,
+            "time_remaining": time_remaining,
+            "duration_seconds": round(attack_duration),
+            "elapsed_seconds": round(elapsed) if not attack_active else None,
+        }
+
+    @app.post("/api/demo/start")
+    async def demo_start():
+        nonlocal demo_mode_active
+        demo_mode_active = True
+        return {"demo_mode": True}
+
+    @app.post("/api/demo/stop")
+    async def demo_stop():
+        nonlocal demo_mode_active
+        demo_mode_active = False
+        return {"demo_mode": False}
+
+    @app.get("/api/demo/status")
+    async def demo_status():
+        return {"demo_mode": demo_mode_active}
+
+    @app.get("/api/connections")
+    async def get_connections():
+        return ws_manager.get_connection_stats()
+
+    # ------------------------------------------------------------------
+    # WebSocket Endpoint
+    # ------------------------------------------------------------------
+
+    @app.websocket("/ws/live")
+    async def websocket_endpoint(websocket: WebSocket):
+        client_id = uuid.uuid4().hex[:8]
+        await ws_manager.connect(websocket, client_id)
+        try:
+            while True:
+                data = await websocket.receive_text()
+                await ws_manager.handle_client_message(client_id, data)
+        except WebSocketDisconnect:
+            await ws_manager.disconnect(client_id)
+
+    # ------------------------------------------------------------------
+    # Expose shared state and manager for pipeline integration
+    # ------------------------------------------------------------------
+
+    app.state.pipeline = state
+    app.state.ws_manager = ws_manager
+
     if DEMO_MODE:
         @app.on_event("startup")
         async def start_demo():
             asyncio.create_task(_demo_loop())
-
-        original_simulate = trigger_simulation
-
-        async def _auto_stop(sim_id: str, delay: float, started_at: float):
-            """Broadcast simulation_stopped after `delay` seconds."""
-            await asyncio.sleep(delay)
-            nonlocal epsilon, attack_active, active_sim_id
-            if active_sim_id != sim_id:
-                return  # already stopped manually or replaced by a new attack
-            elapsed = round(time.time() - started_at)
-            attack_active = False
-            active_sim_id = None
-            epsilon = 0.0
-            await ws_manager.broadcast(
-                {
-                    "type": "simulation_stopped",
-                    "data": {"sim_id": sim_id, "status": "completed", "elapsed_seconds": elapsed},
-                },
-                topic="state",
-            )
-
-        @app.post("/api/simulate", include_in_schema=False)
-        async def trigger_simulation_demo(request: SimulateRequest):
-            nonlocal epsilon, attack_active, active_sim_id, attack_start_time, attack_duration
-            epsilon = request.epsilon
-            attack_active = True
-            attack_start_time = time.time()
-            result = await original_simulate(request)
-            active_sim_id = result["sim_id"]
-            await ws_manager.broadcast(
-                {"type": "simulation_started", "data": result},
-                topic="state",
-            )
-            # Auto-stop: 2 ms per sample, minimum 10 s, maximum 120 s
-            duration = max(10.0, min(request.n_samples * 0.002, 120.0))
-            attack_duration = duration
-            asyncio.create_task(_auto_stop(result["sim_id"], duration, attack_start_time))
-            result["duration_seconds"] = round(duration)
-            return result
-
-        @app.post("/api/simulate/stop")
-        async def stop_simulation():
-            nonlocal epsilon, attack_active, active_sim_id, attack_start_time
-            stopped_id = active_sim_id
-            elapsed = round(time.time() - attack_start_time) if attack_active and attack_start_time else 0
-            attack_active = False
-            active_sim_id = None
-            # epsilon decays naturally in the loop; snap to 0 immediately
-            epsilon = 0.0
-            await ws_manager.broadcast(
-                {
-                    "type": "simulation_stopped",
-                    "data": {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed},
-                },
-                topic="state",
-            )
-            return {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}
-
-        @app.post("/api/demo/start")
-        async def demo_start():
-            nonlocal demo_mode_active
-            demo_mode_active = True
-            return {"demo_mode": True}
-
-        @app.post("/api/demo/stop")
-        async def demo_stop():
-            nonlocal demo_mode_active
-            demo_mode_active = False
-            return {"demo_mode": False}
-
-        @app.get("/api/demo/status")
-        async def demo_status():
-            return {"demo_mode": demo_mode_active}
-
-        @app.get("/api/simulate/status")
-        async def simulation_status():
-            elapsed = time.time() - attack_start_time if attack_start_time else 0
-            time_remaining = max(0, round(attack_duration - elapsed)) if attack_active else 0
-            return {
-                "active": attack_active,
-                "sim_id": active_sim_id,
-                "epsilon": epsilon,
-                "time_remaining": time_remaining,
-                "duration_seconds": round(attack_duration),
-                "elapsed_seconds": round(elapsed) if not attack_active else None,
-            }
 
     return app
 
