@@ -29,6 +29,9 @@ export const api = {
   }),
   stopSimulation:   ()      => fetchJSON('/simulate/stop', { method: 'POST' }),
   simulationStatus: ()      => fetchJSON('/simulate/status'),
+  demoStart:        ()      => fetchJSON('/demo/start', { method: 'POST' }),
+  demoStop:         ()      => fetchJSON('/demo/stop', { method: 'POST' }),
+  demoStatus:       ()      => fetchJSON('/demo/status'),
   getConnections:   ()      => fetchJSON('/connections'),
 };
 

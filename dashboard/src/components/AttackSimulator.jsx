@@ -29,9 +29,16 @@ export default function AttackSimulator({ wsEvents }) {
   const [busy, setBusy]               = useState(false);
   const [activeAttack, setActiveAttack] = useState(null);
   const [countdown, setCountdown]     = useState(null);
-  const [history, setHistory]         = useState([]);   // completed attack log
+  const [history, setHistory]         = useState([]);
+  const [demoMode, setDemoMode]       = useState(false);
+  const [demoBusy, setDemoBusy]       = useState(false);
   const countdownRef  = useRef(null);
-  const startedAtRef  = useRef(null);  // wall-clock when attack started
+  const startedAtRef  = useRef(null);
+
+  // ── sync demo mode state on mount ─────────────────────────
+  useEffect(() => {
+    api.demoStatus?.().then((s) => setDemoMode(s?.demo_mode ?? false)).catch(() => {});
+  }, []);
 
   // ── countdown helpers ──────────────────────────────────────
   const startCountdown = (seconds) => {
@@ -145,6 +152,20 @@ export default function AttackSimulator({ wsEvents }) {
       finishAttack(activeAttack, 'stopped');
     } catch (err) { /* ignore */ }
     setBusy(false);
+  };
+
+  const handleDemoToggle = async () => {
+    setDemoBusy(true);
+    try {
+      if (demoMode) {
+        await api.demoStop();
+        setDemoMode(false);
+      } else {
+        await api.demoStart();
+        setDemoMode(true);
+      }
+    } catch (err) { /* ignore */ }
+    setDemoBusy(false);
   };
 
   const isRunning = !!activeAttack;
@@ -272,6 +293,28 @@ export default function AttackSimulator({ wsEvents }) {
             ))}
           </div>
         )}
+
+        {/* Demo mode toggle */}
+        <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.06em' }}>
+            BACKGROUND SIMULATION
+          </div>
+          <button
+            className="btn"
+            onClick={handleDemoToggle}
+            disabled={demoBusy}
+            style={{
+              width: '100%', justifyContent: 'center', padding: '8px 0',
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              background: demoMode ? 'rgba(0,200,150,0.1)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${demoMode ? 'var(--green)' : 'rgba(255,255,255,0.15)'}`,
+              color: demoMode ? 'var(--green)' : 'var(--text-muted)',
+              opacity: demoBusy ? 0.5 : 1,
+            }}
+          >
+            {demoBusy ? '...' : demoMode ? '◉ DEMO ON — click to stop' : '○ DEMO OFF — click to start'}
+          </button>
+        </div>
 
       </div>
     </div>

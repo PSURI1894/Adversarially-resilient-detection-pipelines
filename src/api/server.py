@@ -316,15 +316,16 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         "psh_flag_cnt", "ack_flag_cnt", "init_fwd_win_byts",
     ]
 
-    epsilon = 0.1        # attack strength; updated by /api/simulate
+    epsilon = 0.0        # attack strength; updated by /api/simulate
     attack_active = False  # True while a simulation is running
+    demo_mode_active = False  # True when background synthetic data is enabled
     active_sim_id: Optional[str] = None
     attack_start_time: float = 0.0
     attack_duration: float = 0.0
 
     async def _demo_loop():
-        """Push synthetic alerts and metrics every ~2 s in demo mode."""
-        nonlocal epsilon, attack_active
+        """Push synthetic alerts and metrics every ~2 s when active."""
+        nonlocal epsilon, attack_active, demo_mode_active
         tick = 0
 
         while True:
@@ -332,18 +333,36 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             tick += 1
             t = time.time()
 
-            # When no attack is active, decay severity back toward baseline
-            effective_eps = epsilon if attack_active else max(0.0, epsilon - 0.02)
-            if not attack_active:
-                epsilon = effective_eps
+            generating = attack_active or demo_mode_active
 
-            # Slowly escalate then cool down (sine wave severity)
-            phase = (tick % 60) / 60.0                        # 0 → 1 over 2 min
-            base_severity = 0.3 + 0.7 * abs(math.sin(math.pi * phase))
-            noise = random.uniform(-0.05, 0.05)
-            severity = min(1.0, max(0.0, base_severity * (1 + effective_eps * 3) + noise))
+            if not generating:
+                # Idle: broadcast a quiet STABLE state so the dashboard stays fresh
+                state.soc_state = "STABLE"
+                state.severity = 0.0
+                state.alert_debt = 0.0
+                state.calibration_drift = 0.0
+                state.disagreement = 0.0
+                await ws_manager.broadcast(
+                    {"type": "state", "data": {
+                        "soc_state": "STABLE", "severity": 0.0,
+                        "alert_debt": 0.0, "calibration_drift": 0.0,
+                        "n_evaluations": state.n_evaluations,
+                    }},
+                    topic="state",
+                )
+                continue
 
-            # SOC state
+            # ── Active: generate synthetic data ───────────────────────────
+            if attack_active:
+                # Attack: severity driven by epsilon, high noise
+                severity = min(1.0, 0.55 + epsilon * 2.5 + random.uniform(-0.05, 0.1))
+            else:
+                # Demo background: sine-wave severity cycle
+                phase = (tick % 60) / 60.0
+                severity = min(1.0, max(0.0,
+                    0.3 + 0.7 * abs(math.sin(math.pi * phase)) + random.uniform(-0.05, 0.05)
+                ))
+
             if severity > 0.75:
                 soc_state = "CRISIS"
             elif severity > 0.45:
@@ -353,15 +372,13 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
             alert_debt = severity * 80 + random.uniform(-5, 5)
 
-            # Update shared state
             state.soc_state = soc_state
             state.severity = round(severity, 3)
             state.alert_debt = round(max(0, alert_debt), 1)
-            state.calibration_drift = round(random.uniform(0, 0.12) * epsilon * 5, 3)
+            state.calibration_drift = round(random.uniform(0, 0.12) * max(epsilon, 0.05) * 5, 3)
             state.disagreement = round(random.uniform(0.0, 0.3) * severity, 3)
             state.n_evaluations += random.randint(80, 150)
 
-            # Synthetic alert
             pred = random.choices([0, 1, 2], weights=[0.5, 0.3, 0.2])[0]
             p = [random.uniform(0, 0.3), random.uniform(0, 0.5), random.uniform(0, 0.4)]
             p_sum = sum(p) or 1
@@ -389,7 +406,6 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             }
             state.push_alert(alert)
 
-            # Update history lists
             state.uncertainty_history.append(round(random.uniform(0.1, 0.9) * severity, 3))
             state.severity_history.append(round(severity, 3))
             state.latency_history.append(alert["latency_ms"])
@@ -401,19 +417,15 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             state.set_size_history.append({"timestamp": t, "value": round(1 + severity, 2)})
             state.drift_history.append({"timestamp": t, "value": state.calibration_drift})
 
-            # Broadcast to WebSocket clients
             await ws_manager.broadcast({"type": "alert", "data": alert}, topic="alerts")
             await ws_manager.broadcast(
-                {
-                    "type": "state",
-                    "data": {
-                        "soc_state": soc_state,
-                        "severity": state.severity,
-                        "alert_debt": state.alert_debt,
-                        "calibration_drift": state.calibration_drift,
-                        "n_evaluations": state.n_evaluations,
-                    },
-                },
+                {"type": "state", "data": {
+                    "soc_state": soc_state,
+                    "severity": state.severity,
+                    "alert_debt": state.alert_debt,
+                    "calibration_drift": state.calibration_drift,
+                    "n_evaluations": state.n_evaluations,
+                }},
                 topic="state",
             )
 
@@ -478,6 +490,22 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 topic="state",
             )
             return {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}
+
+        @app.post("/api/demo/start")
+        async def demo_start():
+            nonlocal demo_mode_active
+            demo_mode_active = True
+            return {"demo_mode": True}
+
+        @app.post("/api/demo/stop")
+        async def demo_stop():
+            nonlocal demo_mode_active
+            demo_mode_active = False
+            return {"demo_mode": False}
+
+        @app.get("/api/demo/status")
+        async def demo_status():
+            return {"demo_mode": demo_mode_active}
 
         @app.get("/api/simulate/status")
         async def simulation_status():
