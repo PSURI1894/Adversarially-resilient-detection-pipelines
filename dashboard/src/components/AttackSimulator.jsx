@@ -59,19 +59,30 @@ export default function AttackSimulator({ wsEvents }) {
     }
   }, [wsEvents]);
 
-  // Restore state on mount (handles page reload while attack is running)
+  // On mount: restore state if attack is already running
   useEffect(() => {
     api.simulationStatus?.().then((s) => {
       if (s?.active) {
-        setActiveAttack({
-          sim_id: s.sim_id,
-          epsilon: s.epsilon,
-          duration_seconds: s.duration_seconds,
-        });
+        setActiveAttack({ sim_id: s.sim_id, epsilon: s.epsilon, duration_seconds: s.duration_seconds });
         if (s.time_remaining > 0) startCountdown(s.time_remaining);
       }
     }).catch(() => {});
   }, []);
+
+  // Poll every 2 s while active — self-corrects even if WS event was missed
+  useEffect(() => {
+    if (!activeAttack) return;
+    const id = setInterval(() => {
+      api.simulationStatus?.().then((s) => {
+        if (!s?.active) {
+          setActiveAttack(null);
+          clearCountdown();
+          setLastResult({ status: 'completed', sim_id: activeAttack?.sim_id });
+        }
+      }).catch(() => {});
+    }, 2000);
+    return () => clearInterval(id);
+  }, [activeAttack]);
 
   const handleLaunch = async () => {
     setBusy(true);
