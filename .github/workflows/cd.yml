@@ -2,11 +2,9 @@
 # CD PIPELINE — ADVERSARIALLY RESILIENT IDS
 # ==============================================================================
 # Triggers: after CI passes on main
-# Jobs: deploy latest code to EC2, rebuild and restart Docker containers
-#
 # Required GitHub Secrets:
-#   EC2_HOST       — Public IP of your EC2 instance (e.g. 52.204.133.3)
-#   EC2_SSH_KEY    — Contents of ardp-key.pem
+#   EC2_HOST    — Public IP of your EC2 instance
+#   EC2_SSH_KEY — Contents of ardp-key.pem
 # ==============================================================================
 
 name: CD Pipeline
@@ -16,7 +14,7 @@ on:
     workflows: ["CI Pipeline"]
     branches: [main]
     types: [completed]
-  workflow_dispatch:   # allow manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -33,23 +31,33 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ardp-key.pem
           chmod 400 ~/.ssh/ardp-key.pem
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Package and upload code
         run: |
-          tar --exclude='./.git' --exclude='./data/raw' \
-              --exclude='./__pycache__' --exclude='./*.pyc' \
+          tar --exclude='./.git' \
+              --exclude='./data/raw' \
+              --exclude='./__pycache__' \
+              --exclude='./*.pyc' \
               --exclude='./.venv' --exclude='./venv' --exclude='./tf_env' \
               --exclude='./node_modules' --exclude='./dashboard/node_modules' \
               --exclude='./infrastructure/aws/ardp-key.pem' \
               --exclude='./*.db' --exclude='./mlflow.db' \
               -czf /tmp/ardp-deploy.tar.gz .
-          scp -i ~/.ssh/ardp-key.pem /tmp/ardp-deploy.tar.gz \
+          scp -i ~/.ssh/ardp-key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              /tmp/ardp-deploy.tar.gz \
               ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/ardp-deploy.tar.gz
 
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/ardp-key.pem ec2-user@${{ secrets.EC2_HOST }} << 'REMOTE'
+          ssh -i ~/.ssh/ardp-key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              -o ServerAliveInterval=60 \
+              -o ServerAliveCountMax=10 \
+              ec2-user@${{ secrets.EC2_HOST }} << 'REMOTE'
             set -e
 
             echo "Extracting latest code..."
@@ -62,13 +70,10 @@ jobs:
             chmod -R 777 /home/ec2-user/ardp/data
 
             echo "Rebuilding and restarting containers..."
-            sudo docker compose \
+            docker compose \
               --project-directory /home/ec2-user/ardp \
               -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml \
               up -d --build --remove-orphans
-
-            echo "Fixing mlruns volume permissions..."
-            sudo docker run --rm -v ardp_mlruns:/app/mlruns alpine chmod 777 /app/mlruns
 
             echo "Waiting for API to be healthy..."
             for i in $(seq 1 18); do
@@ -81,7 +86,7 @@ jobs:
             done
 
             echo "Deployment complete!"
-            sudo docker compose \
+            docker compose \
               --project-directory /home/ec2-user/ardp \
               -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml \
               ps

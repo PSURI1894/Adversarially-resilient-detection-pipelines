@@ -256,9 +256,15 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
     DEMO_MODE = os.environ.get("ARDP_MODE", "demo") == "demo"
 
     _FEATURES = [
-        "flow_duration", "pkt_len_mean", "bwd_pkt_len_max",
-        "flow_iat_mean", "fwd_iat_total", "bwd_iat_total",
-        "psh_flag_cnt", "ack_flag_cnt", "init_fwd_win_byts",
+        "flow_duration",
+        "pkt_len_mean",
+        "bwd_pkt_len_max",
+        "flow_iat_mean",
+        "fwd_iat_total",
+        "bwd_iat_total",
+        "psh_flag_cnt",
+        "ack_flag_cnt",
+        "init_fwd_win_byts",
     ]
 
     epsilon: float = 0.0
@@ -291,13 +297,18 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 state.set_size_history.append({"timestamp": time.time(), "value": 1.0})
                 state.uncertainty_history.append(0.05)
                 await ws_manager.broadcast(
-                    {"type": "state", "data": {
-                        "soc_state": "STABLE", "severity": 0.0,
-                        "alert_debt": 0.0, "calibration_drift": 0.0,
-                        "n_evaluations": state.n_evaluations,
-                        "set_size": 1.0,
-                        "uncertainty": 0.05,
-                    }},
+                    {
+                        "type": "state",
+                        "data": {
+                            "soc_state": "STABLE",
+                            "severity": 0.0,
+                            "alert_debt": 0.0,
+                            "calibration_drift": 0.0,
+                            "n_evaluations": state.n_evaluations,
+                            "set_size": 1.0,
+                            "uncertainty": 0.05,
+                        },
+                    },
                     topic="state",
                 )
                 continue
@@ -307,15 +318,29 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 severity = min(1.0, 0.6 + epsilon * 2.5 + random.uniform(-0.05, 0.1))
             else:
                 phase = (tick % 60) / 60.0
-                severity = min(1.0, max(0.0,
-                    0.3 + 0.7 * abs(math.sin(math.pi * phase)) + random.uniform(-0.05, 0.05)
-                ))
+                severity = min(
+                    1.0,
+                    max(
+                        0.0,
+                        0.3
+                        + 0.7 * abs(math.sin(math.pi * phase))
+                        + random.uniform(-0.05, 0.05),
+                    ),
+                )
 
-            soc_state = "CRISIS" if severity > 0.75 else "ELEVATED" if severity > 0.45 else "STABLE"
+            soc_state = (
+                "CRISIS"
+                if severity > 0.75
+                else "ELEVATED"
+                if severity > 0.45
+                else "STABLE"
+            )
             state.soc_state = soc_state
             state.severity = round(severity, 3)
             state.alert_debt = round(max(0, severity * 80 + random.uniform(-5, 5)), 1)
-            state.calibration_drift = round(random.uniform(0, 0.12) * max(epsilon, 0.05) * 5, 3)
+            state.calibration_drift = round(
+                random.uniform(0, 0.12) * max(epsilon, 0.05) * 5, 3
+            )
             state.disagreement = round(random.uniform(0.0, 0.3) * severity, 3)
             state.n_evaluations += random.randint(80, 150)
 
@@ -331,7 +356,9 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 "timestamp": t,
                 "prediction": pred,
                 "probabilities": p,
-                "prediction_set": [pred] if uncertainty == "LOW" else [pred, (pred + 1) % 3],
+                "prediction_set": [pred]
+                if uncertainty == "LOW"
+                else [pred, (pred + 1) % 3],
                 "uncertainty": uncertainty,
                 "latency_ms": round(random.uniform(8, 45), 1),
                 "severity": round(severity, 3),
@@ -345,29 +372,52 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 ],
             }
             state.push_alert(alert)
-            state.uncertainty_history.append(round(random.uniform(0.1, 0.9) * severity, 3))
+            state.uncertainty_history.append(
+                round(random.uniform(0.1, 0.9) * severity, 3)
+            )
             state.severity_history.append(round(severity, 3))
             state.latency_history.append(alert["latency_ms"])
             # set_size: 1.0 = fully confident, >1.5 = HIGH uncertainty
             # Only climbs above 1.1 when severity is meaningful (attack/high demo)
-            set_size = round(1.0 + max(0.0, severity - 0.3) * 1.4 + random.uniform(-0.05, 0.05), 2)
-            state.f1_history.append({"timestamp": t, "value": round(max(0, 1 - severity * 0.6 + random.uniform(-0.05, 0.05)), 3)})
-            state.fdr_history.append({"timestamp": t, "value": round(severity * 0.4 + random.uniform(0, 0.1), 3)})
-            state.auc_history.append({"timestamp": t, "value": round(max(0.5, 1 - severity * 0.3), 3)})
+            set_size = round(
+                1.0 + max(0.0, severity - 0.3) * 1.4 + random.uniform(-0.05, 0.05), 2
+            )
+            state.f1_history.append(
+                {
+                    "timestamp": t,
+                    "value": round(
+                        max(0, 1 - severity * 0.6 + random.uniform(-0.05, 0.05)), 3
+                    ),
+                }
+            )
+            state.fdr_history.append(
+                {
+                    "timestamp": t,
+                    "value": round(severity * 0.4 + random.uniform(0, 0.1), 3),
+                }
+            )
+            state.auc_history.append(
+                {"timestamp": t, "value": round(max(0.5, 1 - severity * 0.3), 3)}
+            )
             state.set_size_history.append({"timestamp": t, "value": max(1.0, set_size)})
-            state.drift_history.append({"timestamp": t, "value": state.calibration_drift})
+            state.drift_history.append(
+                {"timestamp": t, "value": state.calibration_drift}
+            )
 
             await ws_manager.broadcast({"type": "alert", "data": alert}, topic="alerts")
             await ws_manager.broadcast(
-                {"type": "state", "data": {
-                    "soc_state": soc_state,
-                    "severity": state.severity,
-                    "alert_debt": state.alert_debt,
-                    "calibration_drift": state.calibration_drift,
-                    "n_evaluations": state.n_evaluations,
-                    "set_size": max(1.0, set_size),
-                    "uncertainty": round(random.uniform(0.1, 0.9) * severity, 3),
-                }},
+                {
+                    "type": "state",
+                    "data": {
+                        "soc_state": soc_state,
+                        "severity": state.severity,
+                        "alert_debt": state.alert_debt,
+                        "calibration_drift": state.calibration_drift,
+                        "n_evaluations": state.n_evaluations,
+                        "set_size": max(1.0, set_size),
+                        "uncertainty": round(random.uniform(0.1, 0.9) * severity, 3),
+                    },
+                },
                 topic="state",
             )
 
@@ -381,8 +431,14 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
         active_sim_id = None
         epsilon = 0.0
         await ws_manager.broadcast(
-            {"type": "simulation_stopped",
-             "data": {"sim_id": sim_id, "status": "completed", "elapsed_seconds": elapsed}},
+            {
+                "type": "simulation_stopped",
+                "data": {
+                    "sim_id": sim_id,
+                    "status": "completed",
+                    "elapsed_seconds": elapsed,
+                },
+            },
             topic="state",
         )
 
@@ -392,7 +448,12 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
     @app.post("/api/simulate")
     async def trigger_simulation(request: SimulateRequest):
-        nonlocal epsilon, attack_active, active_sim_id, attack_start_time, attack_duration
+        nonlocal \
+            epsilon, \
+            attack_active, \
+            active_sim_id, \
+            attack_start_time, \
+            attack_duration
         sim_id = uuid.uuid4().hex[:8]
 
         if DEMO_MODE:
@@ -425,13 +486,23 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
     async def stop_simulation():
         nonlocal epsilon, attack_active, active_sim_id, attack_start_time
         stopped_id = active_sim_id
-        elapsed = round(time.time() - attack_start_time) if attack_active and attack_start_time else 0
+        elapsed = (
+            round(time.time() - attack_start_time)
+            if attack_active and attack_start_time
+            else 0
+        )
         attack_active = False
         active_sim_id = None
         epsilon = 0.0
         await ws_manager.broadcast(
-            {"type": "simulation_stopped",
-             "data": {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}},
+            {
+                "type": "simulation_stopped",
+                "data": {
+                    "sim_id": stopped_id,
+                    "status": "stopped",
+                    "elapsed_seconds": elapsed,
+                },
+            },
             topic="state",
         )
         return {"sim_id": stopped_id, "status": "stopped", "elapsed_seconds": elapsed}
@@ -439,7 +510,9 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
     @app.get("/api/simulate/status")
     async def simulation_status():
         elapsed = time.time() - attack_start_time if attack_start_time else 0
-        time_remaining = max(0, round(attack_duration - elapsed)) if attack_active else 0
+        time_remaining = (
+            max(0, round(attack_duration - elapsed)) if attack_active else 0
+        )
         return {
             "active": attack_active,
             "sim_id": active_sim_id,
@@ -492,6 +565,7 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
     app.state.ws_manager = ws_manager
 
     if DEMO_MODE:
+
         @app.on_event("startup")
         async def start_demo():
             asyncio.create_task(_demo_loop())

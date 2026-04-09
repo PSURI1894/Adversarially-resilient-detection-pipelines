@@ -5,7 +5,12 @@ Lines: ~200-250
 
 import pytest
 import numpy as np
-from src.detection_ensemble import ResilientTrainer, EnsembleOrchestrator
+
+tf = pytest.importorskip(
+    "tensorflow", reason="TensorFlow not installed — skipping model tests"
+)
+
+from src.detection_ensemble import ResilientTrainer, EnsembleOrchestrator  # noqa: E402
 
 
 class TestModelLogic:

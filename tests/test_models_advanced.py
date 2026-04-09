@@ -7,17 +7,20 @@ TEST SUITE — ADVANCED MODELS & DEEP ENSEMBLE
 
 import pytest
 import numpy as np
-import tensorflow as tf
 
-from src.models.tab_transformer import TabTransformer
-from src.models.variational_autoencoder import VAIDS
-from src.models.deep_ensemble import DeepEnsemble
-from src.models.adversarial_trainer import (
+tf = pytest.importorskip(
+    "tensorflow", reason="TensorFlow not installed — skipping advanced model tests"
+)
+
+from src.models.tab_transformer import TabTransformer  # noqa: E402
+from src.models.variational_autoencoder import VAIDS  # noqa: E402
+from src.models.deep_ensemble import DeepEnsemble  # noqa: E402
+from src.models.adversarial_trainer import (  # noqa: E402
     PGDTrainer,
     TRADESTrainer,
     FreeAdversarialTrainer,
 )
-from src.models.calibration import (
+from src.models.calibration import (  # noqa: E402
     TemperatureScaling,
     IsotonicCalibration,
     CalibrationAudit,

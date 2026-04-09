@@ -1,0 +1,43 @@
+# ==============================================================================
+# CI REQUIREMENTS — lightweight subset for GitHub Actions test jobs
+# Excludes TensorFlow (too slow/heavy for CI; TF-dependent tests use importorskip)
+# ==============================================================================
+
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+xgboost>=2.0
+scipy>=1.11
+
+# Explainability
+shap>=0.43
+lime>=0.2
+
+# MLOps
+mlflow>=2.9
+
+# Streaming (kafka/redis clients — no broker needed for unit tests)
+kafka-python>=2.0
+redis>=5.0
+
+# API & Serving
+fastapi>=0.104
+uvicorn>=0.24
+websockets>=12.0
+httpx>=0.24
+
+# Monitoring
+prometheus-client>=0.19
+
+# Configuration
+hydra-core>=1.3
+omegaconf>=2.3
+pydantic>=2.5
+
+# Visualization
+matplotlib>=3.7
+
+# Testing
+pytest>=7.4
+pytest-cov>=4.1
+pytest-timeout>=2.2
