@@ -63,9 +63,11 @@ export default function App() {
   // ── Derived state ────────────────────────────────────────
   const socState = status?.soc_state || 'STABLE';
   const severity = status?.severity ?? 0;
-  const avgSetSize = metrics?.set_size_history?.length
-    ? metrics.set_size_history[metrics.set_size_history.length - 1]?.value ?? 1.0
-    : 1.0;
+  // Prefer live WS value (updates every 2s); fall back to last REST poll value
+  const avgSetSize = status?.set_size
+    ?? (metrics?.set_size_history?.length
+      ? metrics.set_size_history[metrics.set_size_history.length - 1]?.value ?? 1.0
+      : 1.0);
 
   return (
     <div className="dashboard-layout">

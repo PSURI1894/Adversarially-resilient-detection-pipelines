@@ -287,11 +287,16 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                 state.alert_debt = 0.0
                 state.calibration_drift = 0.0
                 state.disagreement = 0.0
+                # Push set_size=1.0 so uncertainty gauge resets to NORMAL
+                state.set_size_history.append({"timestamp": time.time(), "value": 1.0})
+                state.uncertainty_history.append(0.05)
                 await ws_manager.broadcast(
                     {"type": "state", "data": {
                         "soc_state": "STABLE", "severity": 0.0,
                         "alert_debt": 0.0, "calibration_drift": 0.0,
                         "n_evaluations": state.n_evaluations,
+                        "set_size": 1.0,
+                        "uncertainty": 0.05,
                     }},
                     topic="state",
                 )
@@ -343,10 +348,13 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
             state.uncertainty_history.append(round(random.uniform(0.1, 0.9) * severity, 3))
             state.severity_history.append(round(severity, 3))
             state.latency_history.append(alert["latency_ms"])
+            # set_size: 1.0 = fully confident, >1.5 = HIGH uncertainty
+            # Only climbs above 1.1 when severity is meaningful (attack/high demo)
+            set_size = round(1.0 + max(0.0, severity - 0.3) * 1.4 + random.uniform(-0.05, 0.05), 2)
             state.f1_history.append({"timestamp": t, "value": round(max(0, 1 - severity * 0.6 + random.uniform(-0.05, 0.05)), 3)})
             state.fdr_history.append({"timestamp": t, "value": round(severity * 0.4 + random.uniform(0, 0.1), 3)})
             state.auc_history.append({"timestamp": t, "value": round(max(0.5, 1 - severity * 0.3), 3)})
-            state.set_size_history.append({"timestamp": t, "value": round(1 + severity, 2)})
+            state.set_size_history.append({"timestamp": t, "value": max(1.0, set_size)})
             state.drift_history.append({"timestamp": t, "value": state.calibration_drift})
 
             await ws_manager.broadcast({"type": "alert", "data": alert}, topic="alerts")
@@ -357,6 +365,8 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
                     "alert_debt": state.alert_debt,
                     "calibration_drift": state.calibration_drift,
                     "n_evaluations": state.n_evaluations,
+                    "set_size": max(1.0, set_size),
+                    "uncertainty": round(random.uniform(0.1, 0.9) * severity, 3),
                 }},
                 topic="state",
             )
