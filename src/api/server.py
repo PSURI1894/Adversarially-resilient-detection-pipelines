@@ -15,6 +15,10 @@ Endpoints:
 ================================================================================
 """
 
+import asyncio
+import math
+import os
+import random
 import time
 import uuid
 import logging
@@ -299,6 +303,121 @@ def create_app(pipeline_state: Optional[PipelineState] = None) -> FastAPI:
 
     app.state.pipeline = state
     app.state.ws_manager = ws_manager
+
+    # ------------------------------------------------------------------
+    # Demo mode: continuous synthetic data generator
+    # ------------------------------------------------------------------
+
+    DEMO_MODE = os.environ.get("ARDP_MODE", "demo") == "demo"
+
+    _FEATURES = [
+        "flow_duration", "pkt_len_mean", "bwd_pkt_len_max",
+        "flow_iat_mean", "fwd_iat_total", "bwd_iat_total",
+        "psh_flag_cnt", "ack_flag_cnt", "init_fwd_win_byts",
+    ]
+
+    epsilon = 0.1  # attack strength; updated by /api/simulate
+
+    async def _demo_loop():
+        """Push synthetic alerts and metrics every ~2 s in demo mode."""
+        nonlocal epsilon
+        tick = 0
+
+        while True:
+            await asyncio.sleep(2)
+            tick += 1
+            t = time.time()
+
+            # Slowly escalate then cool down (sine wave severity)
+            phase = (tick % 60) / 60.0                        # 0 → 1 over 2 min
+            base_severity = 0.3 + 0.7 * abs(math.sin(math.pi * phase))
+            noise = random.uniform(-0.05, 0.05)
+            severity = min(1.0, max(0.0, base_severity * (1 + epsilon * 3) + noise))
+
+            # SOC state
+            if severity > 0.75:
+                soc_state = "CRISIS"
+            elif severity > 0.45:
+                soc_state = "ELEVATED"
+            else:
+                soc_state = "STABLE"
+
+            alert_debt = severity * 80 + random.uniform(-5, 5)
+
+            # Update shared state
+            state.soc_state = soc_state
+            state.severity = round(severity, 3)
+            state.alert_debt = round(max(0, alert_debt), 1)
+            state.calibration_drift = round(random.uniform(0, 0.12) * epsilon * 5, 3)
+            state.disagreement = round(random.uniform(0.0, 0.3) * severity, 3)
+            state.n_evaluations += random.randint(80, 150)
+
+            # Synthetic alert
+            pred = random.choices([0, 1, 2], weights=[0.5, 0.3, 0.2])[0]
+            p = [random.uniform(0, 0.3), random.uniform(0, 0.5), random.uniform(0, 0.4)]
+            p_sum = sum(p) or 1
+            p = [round(x / p_sum, 3) for x in p]
+            uncertainty = "HIGH" if severity > 0.6 else "LOW"
+            shap_vals = [round(random.uniform(-0.5, 0.5), 3) for _ in _FEATURES]
+
+            alert = {
+                "id": uuid.uuid4().hex[:8],
+                "timestamp": t,
+                "prediction": pred,
+                "probabilities": p,
+                "prediction_set": [pred] if uncertainty == "LOW" else [pred, (pred + 1) % 3],
+                "uncertainty": uncertainty,
+                "latency_ms": round(random.uniform(8, 45), 1),
+                "severity": round(severity, 3),
+                "shap_values": shap_vals,
+                "shap_features": _FEATURES,
+                "top_features": sorted(
+                    zip(_FEATURES, shap_vals), key=lambda x: abs(x[1]), reverse=True
+                )[:5],
+            }
+            state.push_alert(alert)
+
+            # Update history lists
+            state.uncertainty_history.append(round(random.uniform(0.1, 0.9) * severity, 3))
+            state.severity_history.append(round(severity, 3))
+            state.latency_history.append(alert["latency_ms"])
+
+            f1 = round(max(0, 1 - severity * 0.6 + random.uniform(-0.05, 0.05)), 3)
+            state.f1_history.append({"timestamp": t, "value": f1})
+            state.fdr_history.append({"timestamp": t, "value": round(severity * 0.4 + random.uniform(0, 0.1), 3)})
+            state.auc_history.append({"timestamp": t, "value": round(max(0.5, 1 - severity * 0.3), 3)})
+            state.set_size_history.append({"timestamp": t, "value": round(1 + severity, 2)})
+            state.drift_history.append({"timestamp": t, "value": state.calibration_drift})
+
+            # Broadcast to WebSocket clients
+            await ws_manager.broadcast({"type": "alert", "data": alert}, topic="alerts")
+            await ws_manager.broadcast(
+                {
+                    "type": "state",
+                    "data": {
+                        "soc_state": soc_state,
+                        "severity": state.severity,
+                        "alert_debt": state.alert_debt,
+                        "calibration_drift": state.calibration_drift,
+                        "n_evaluations": state.n_evaluations,
+                    },
+                },
+                topic="state",
+            )
+
+    if DEMO_MODE:
+        @app.on_event("startup")
+        async def start_demo():
+            asyncio.create_task(_demo_loop())
+
+        # Patch /api/simulate to update attack strength so the demo reacts
+        original_simulate = trigger_simulation
+
+        @app.post("/api/simulate", include_in_schema=False)
+        async def trigger_simulation_demo(request: SimulateRequest):
+            nonlocal epsilon
+            epsilon = request.epsilon
+            return await original_simulate(request)
 
     return app
 
