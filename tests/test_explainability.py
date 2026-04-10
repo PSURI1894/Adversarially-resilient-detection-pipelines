@@ -337,7 +337,7 @@ class TestIncidentReporter:
             )
             path = reporter.export_html(report)
             assert os.path.exists(path)
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 html = f.read()
             assert "Incident Report" in html
             assert "EVASION_LOCKED" in html

@@ -152,7 +152,7 @@ class IncidentReporter:
         path = os.path.join(self.output_dir, filename)
 
         html = self._render_html(report)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(html)
         return path
 

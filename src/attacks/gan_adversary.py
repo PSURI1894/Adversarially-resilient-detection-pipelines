@@ -19,6 +19,8 @@ except ImportError:  # pragma: no cover
     layers = None  # type: ignore[assignment]
     Model = object  # type: ignore[assignment,misc]
 
+_tf_function = tf.function if tf is not None else (lambda f: f)
+
 from typing import Optional, List
 
 
@@ -71,8 +73,8 @@ class AdversarialGAN:
         norm = tf.sqrt(tf.reduce_sum(tf.square(grads), axis=1) + 1e-12)
         return tf.reduce_mean(tf.square(norm - 1.0))
 
-    @tf.function
-    def _train_step(self, real_data: tf.Tensor):
+    @_tf_function
+    def _train_step(self, real_data):
         batch = tf.shape(real_data)[0]
         # ── Discriminator ─────────
         z = tf.random.normal([batch, self.latent_dim])

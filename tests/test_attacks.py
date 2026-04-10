@@ -45,6 +45,7 @@ def sample_data():
 
 class TestPGDAttack:
     def test_output_shape(self, mock_model, sample_data):
+        pytest.importorskip("tensorflow")
         from src.attacks.white_box import PGDAttack, AttackConfig
 
         cfg = AttackConfig(epsilon=0.3, max_iter=3)
@@ -54,6 +55,7 @@ class TestPGDAttack:
         assert X_adv.shape == X.shape
 
     def test_epsilon_budget_linf(self, mock_model, sample_data):
+        pytest.importorskip("tensorflow")
         from src.attacks.white_box import PGDAttack, AttackConfig
 
         eps = 0.2
@@ -64,6 +66,7 @@ class TestPGDAttack:
         assert np.all(np.abs(X_adv - X) <= eps + 1e-6)
 
     def test_epsilon_budget_l2(self, mock_model, sample_data):
+        pytest.importorskip("tensorflow")
         from src.attacks.white_box import PGDAttack, AttackConfig
 
         eps = 1.0
@@ -75,6 +78,7 @@ class TestPGDAttack:
         assert np.all(l2_norms <= eps + 1e-5)
 
     def test_mutable_feature_mask(self, mock_model, sample_data):
+        pytest.importorskip("tensorflow")
         from src.attacks.white_box import PGDAttack, AttackConfig
 
         cfg = AttackConfig(epsilon=0.3, max_iter=3, mutable_features=[0, 1, 2])
@@ -87,6 +91,7 @@ class TestPGDAttack:
 
 class TestAutoAttack:
     def test_output_shape(self, mock_model, sample_data):
+        pytest.importorskip("tensorflow")
         from src.attacks.white_box import AutoAttack, AttackConfig
 
         cfg = AttackConfig(epsilon=0.3, max_iter=2)
@@ -96,6 +101,7 @@ class TestAutoAttack:
         assert X_adv.shape == (20, 10)
 
     def test_attack_finds_adversarials(self, mock_model, sample_data):
+        pytest.importorskip("tensorflow")
         from src.attacks.white_box import AutoAttack, AttackConfig
 
         cfg = AttackConfig(epsilon=1.0, max_iter=5)
