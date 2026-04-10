@@ -334,12 +334,6 @@ Required GitHub secrets: `EC2_HOST`, `EC2_SSH_KEY`.
 
 ---
 
-## License
-
-MIT License. See `LICENSE` for details.
-
----
-
 ## Contributing
 
 Please read [docs/contributing.md](docs/contributing.md) before opening a PR.
