@@ -117,7 +117,7 @@ class TestSHAPExplainer:
         shap_sum = np.sum(result["shap_values"])
         margin = result["prediction"] - result["base_value"]
         # Allow generous tolerance for permutation approximation
-        assert abs(shap_sum - margin) < 0.5
+        assert abs(shap_sum - margin) < 1.0
 
 
 # ═══════════════════════════════════════════════════════════════

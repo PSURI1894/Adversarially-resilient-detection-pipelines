@@ -92,15 +92,16 @@ class SHAPExplainer:
         if key in self._shap_cache:
             shap_vals = self._shap_cache[key]
         else:
-            shap_vals = self._compute_shap(x)[0]
+            raw = self._compute_shap(x)
+            # KernelExplainer with predict_proba returns list [class0(n,f), class1(n,f)]
+            if isinstance(raw, list):
+                shap_vals = raw[1]        # class 1 (malicious)
+            else:
+                shap_vals = raw
+            # Squeeze sample dim: (1, n_features) → (n_features,)
+            if isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 2:
+                shap_vals = shap_vals[0]
             self._shap_cache[key] = shap_vals
-
-        # Handle multi-output: take class-1 (malicious) values
-        if isinstance(shap_vals, list):
-            shap_vals = shap_vals[1]
-        if shap_vals.ndim == 2:
-            # Shape is (n_features, n_classes) — take class-1 column
-            shap_vals = shap_vals[:, 1]
 
         pred = self.model.predict_proba(x)[0, 1]
         base = self._get_base_value()
