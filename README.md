@@ -11,48 +11,9 @@ Live dashboard: **http://107.22.150.51/**
 
 ## Architecture
 
-```mermaid
-flowchart TB
+![Architecture](docs/architecture.gif)
 
-classDef data    fill:#0f172a,stroke:#00E5FF,stroke-width:2px,color:#00E5FF;
-classDef detect  fill:#0f172a,stroke:#00FF9C,stroke-width:2px,color:#00FF9C;
-classDef defense fill:#0f172a,stroke:#FF9100,stroke-width:2px,color:#FF9100;
-classDef ops     fill:#0f172a,stroke:#D500F9,stroke-width:2px,color:#D500F9;
-classDef core    fill:#1a1a2e,stroke:#FF1744,stroke-width:3px,color:#FF1744;
-
-subgraph DL[Data Layer]
-    A[CIC-IDS-2018 CSV / Kafka Stream] --> B[Feature Store] --> C[Adversarial Augmentation]
-end
-class A,B,C data
-
-subgraph DET[Detection Layer]
-    D1[XGBoost] --> E[Ensemble Core]
-    D2[1D CNN]  --> E
-    D3[TabTransformer] --> E
-    D4[VAE-IDS] --> E
-    E --> F[MLflow Registry]
-end
-class D1,D2,D3,D4,E,F detect
-class E core
-
-subgraph DEF[Uncertainty & Defense]
-    G[RSCP+ Conformal] --> H[SHAP Fingerprint Detector] --> I[Risk Thermostat FSM]
-end
-class G,H,I defense
-
-subgraph OPS[Operational Layer]
-    J[React / WebSocket Dashboard]
-    K[Playbook Orchestrator]
-    L[Concept Drift Monitor] --> M[Adaptive Retrainer]
-end
-class J,K,L,M ops
-
-C ==> D1 & D2 & D3 & D4
-F ==> G
-I ==> J
-I ==> K
-K ==> L
-```
+> Packets flow left-to-right: raw traffic enters the Data layer, fans through the Detection ensemble, is certified by the Conformal Defense layer, and drives the Ops layer (dashboard, playbooks, drift recovery).
 
 ---
 
