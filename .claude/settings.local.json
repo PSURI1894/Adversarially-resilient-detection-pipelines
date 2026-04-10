@@ -12,7 +12,21 @@
       "Bash(curl -sv --max-time 10 http://54.163.63.17:80/)",
       "Bash(curl -sv --max-time 10 http://54.163.63.17:443/)",
       "Bash(curl -s --max-time 15 http://54.163.63.17:8000/api/status)",
-      "Bash(curl -s --max-time 15 http://54.163.63.17/api/status)"
+      "Bash(curl -s --max-time 15 http://54.163.63.17/api/status)",
+      "Bash(git rm:*)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(aws sts:*)",
+      "Bash(AWS_PROFILE=ardp aws sts get-caller-identity)",
+      "Bash(AWS_PROFILE=ardp aws ec2 describe-key-pairs --key-names ardp-key --query \"KeyPairs[0].KeyName\" --output text)",
+      "Bash(chmod 400 /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/infrastructure/aws/ardp-key.pem)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/infrastructure/aws/ardp-key.pem ec2-user@107.22.150.51 'docker ps 2>/dev/null || sudo docker ps')",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/infrastructure/aws/ardp-key.pem ec2-user@107.22.150.51 'cat /etc/os-release | head -5 && df -h / && free -h')",
+      "Bash(ssh -o StrictHostKeyChecking=no -i /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/infrastructure/aws/ardp-key.pem ec2-user@107.22.150.51)",
+      "Bash(tar --exclude=./.git --exclude=./data/raw --exclude=./__pycache__ '--exclude=./*.pyc' --exclude=./.venv --exclude=./venv --exclude=./tf_env --exclude=./node_modules --exclude=./dashboard/node_modules --exclude=./infrastructure/aws/ardp-key.pem '--exclude=./*.db' --exclude=./mlflow.db --exclude=./.claude -czf /tmp/ardp-deploy.tar.gz -C /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines .)",
+      "Bash(scp -o StrictHostKeyChecking=no -i /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/infrastructure/aws/ardp-key.pem /tmp/ardp-deploy.tar.gz ec2-user@107.22.150.51:/home/ec2-user/ardp-deploy.tar.gz)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/infrastructure/aws/ardp-key.pem ec2-user@107.22.150.51 'sudo docker ps --format '\\\\''table {{.Names}}\\\\t{{.Status}}\\\\t{{.Ports}}'\\\\'' 2>&1; echo '\\\\''---'\\\\''; sudo docker compose --project-directory /home/ec2-user/ardp -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml ps 2>&1')",
+      "Bash(curl -sf http://107.22.150.51/api/status)",
+      "Bash(python -m json.tool)"
     ]
   }
 }

@@ -1,0 +1,32 @@
+# ==============================================================================
+# PRODUCTION REQUIREMENTS — minimal runtime deps for the API server
+# No TF, no XGBoost (pulls nvidia-nccl 293MB), no SHAP/LIME (pulls llvmlite),
+# no MLflow full (pulls pyarrow 47MB). t2.micro has ~8GB disk total.
+# ==============================================================================
+
+# Core ML inference (sklearn handles all production models)
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+scipy>=1.11
+
+# API & Serving
+fastapi>=0.104
+uvicorn[standard]>=0.24
+websockets>=12.0
+httpx>=0.24
+
+# Streaming
+kafka-python>=2.0
+redis>=5.0
+
+# Monitoring & Metrics
+prometheus-client>=0.19
+
+# Configuration
+pydantic>=2.5
+omegaconf>=2.3
+pyyaml>=5.1
+
+# Visualization (used by API report endpoints)
+matplotlib>=3.7

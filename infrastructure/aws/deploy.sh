@@ -215,15 +215,29 @@ ssh -o StrictHostKeyChecking=no -i "${KEY_NAME}.pem" "ec2-user@$PUBLIC_IP" << 'R
   fi
   echo "[INFO] Disk free: $(df -h / | awk 'NR==2 {print $4}')"
 
-  # Install docker if not present
+  # Wait for user-data to finish installing docker (up to 5 min)
+  echo "Waiting for Docker to become available..."
+  for i in $(seq 1 30); do
+    command -v docker &>/dev/null && sudo docker info &>/dev/null && break
+    echo "  Docker not ready yet (attempt $i/30), waiting 10s..."
+    sleep 10
+  done
+
+  # If user-data failed or AMI doesn't have dnf, install manually
   if ! command -v docker &>/dev/null; then
-    sudo dnf install -y docker
+    echo "Docker not installed by user-data, installing manually..."
+    if command -v dnf &>/dev/null; then
+      sudo dnf install -y docker
+    else
+      sudo yum install -y docker
+    fi
+    sudo systemctl enable docker
     sudo systemctl start docker
     sudo usermod -aG docker ec2-user
   fi
 
-  # Install docker compose plugin
-  if ! docker compose version &>/dev/null 2>&1; then
+  # Install docker compose plugin if missing
+  if ! sudo docker compose version &>/dev/null 2>&1; then
     sudo mkdir -p /usr/local/lib/docker/cli-plugins
     sudo curl -SL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64 \
       -o /usr/local/lib/docker/cli-plugins/docker-compose
