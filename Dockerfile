@@ -16,7 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-ci.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements-ci.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements-ci.txt \
+    && find /install -name "*.pyc" -delete \
+    && find /install -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
 FROM python:3.11-slim AS runtime

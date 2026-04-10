@@ -6,11 +6,11 @@
 numpy>=1.24
 pandas>=2.0
 scikit-learn>=1.3
-xgboost>=2.0
+xgboost>=2.0,<2.1  # >=2.1 pulls nvidia-nccl-cu12 (293MB CUDA lib) on CPU hosts
 scipy>=1.11
 
 # Explainability
-shap>=0.43
+shap>=0.43,<0.46   # >=0.46 pulls numba+llvmlite (56MB); stay on numpy-only backend
 lime>=0.2
 
 # MLOps
