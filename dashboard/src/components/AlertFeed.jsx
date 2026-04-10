@@ -60,9 +60,12 @@ function AlertRow({ alert, isSelected, onSelect }) {
   );
 }
 
+const PAGE_SIZE = 10;
+
 export default function AlertFeed({ alerts, stats, onSelectAlert }) {
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const filtered = filter === 'all'
     ? alerts
@@ -75,13 +78,21 @@ export default function AlertFeed({ alerts, stats, onSelectAlert }) {
     onSelectAlert(alert);
   };
 
+  const handleFilterChange = (f) => {
+    setFilter(f);
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
   return (
     <div className="glass-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="glass-panel-header">
         <span>Alert Feed</span>
         <div style={{ display: 'flex', gap: 6 }}>
           {['all', 'threats', 'high'].map((f) => (
-            <button key={f} className="btn" onClick={() => setFilter(f)}
+            <button key={f} className="btn" onClick={() => handleFilterChange(f)}
               style={{
                 padding: '2px 8px', fontSize: 10,
                 borderColor: filter === f ? 'var(--cyan)' : undefined,
@@ -110,14 +121,27 @@ export default function AlertFeed({ alerts, stats, onSelectAlert }) {
             No alerts yet. Waiting for pipeline data...
           </div>
         ) : (
-          filtered.slice(0, 200).map((alert) => (
-            <AlertRow
-              key={alert.id}
-              alert={alert}
-              isSelected={selected === alert.id}
-              onSelect={handleSelect}
-            />
-          ))
+          <>
+            {visible.map((alert) => (
+              <AlertRow
+                key={alert.id}
+                alert={alert}
+                isSelected={selected === alert.id}
+                onSelect={handleSelect}
+              />
+            ))}
+            {hasMore && (
+              <div style={{ padding: '8px 12px', textAlign: 'center' }}>
+                <button
+                  className="btn"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  style={{ fontSize: 10, padding: '4px 16px', color: 'var(--cyan)', borderColor: 'var(--cyan)' }}
+                >
+                  View More ({filtered.length - visibleCount} remaining)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
