@@ -334,20 +334,6 @@ Required GitHub secrets: `EC2_HOST`, `EC2_SSH_KEY`.
 
 ---
 
-## Citation
-
-```bibtex
-@article{ardp2025,
-  author  = {Author},
-  title   = {Adversarially Resilient Detection Pipelines: Certified Conformal
-             Defense with Self-Healing Concept Drift Adaptation},
-  journal = {arXiv preprint},
-  year    = {2025}
-}
-```
-
----
-
 ## License
 
 MIT License. See `LICENSE` for details.
