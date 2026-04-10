@@ -17,7 +17,7 @@ services:
   # ── ARDP API + Pipeline ────────────────────────────────────
   api:
     build:
-      context: ../..
+      context: .
       dockerfile: Dockerfile
     container_name: ardp-api
     command: ["python", "src/api/server.py"]
