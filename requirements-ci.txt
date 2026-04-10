@@ -37,7 +37,7 @@ pydantic>=2.5
 # Visualization
 matplotlib>=3.7
 
-# Testing
-pytest>=7.4
-pytest-cov>=4.1
-pytest-timeout>=2.2
+# Testing (CI only — not installed in Docker image)
+# pytest>=7.4
+# pytest-cov>=4.1
+# pytest-timeout>=2.2
