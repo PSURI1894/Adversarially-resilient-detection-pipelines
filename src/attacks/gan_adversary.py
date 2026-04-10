@@ -19,9 +19,9 @@ except ImportError:  # pragma: no cover
     layers = None  # type: ignore[assignment]
     Model = object  # type: ignore[assignment,misc]
 
-_tf_function = tf.function if tf is not None else (lambda f: f)
-
 from typing import Optional, List
+
+_tf_function = tf.function if tf is not None else (lambda f: f)
 
 
 class AdversarialGAN:
