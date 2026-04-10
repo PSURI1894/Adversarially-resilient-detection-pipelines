@@ -1,0 +1,44 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+    ignore:
+      # Pinned for compatibility — do not auto-bump
+      - dependency-name: numpy
+        versions: [">=2.0"]
+      - dependency-name: shap
+        versions: [">=0.44"]
+      - dependency-name: xgboost
+        versions: [">=2.1"]
+
+  # Node.js / dashboard dependencies
+  - package-ecosystem: npm
+    directory: "/dashboard"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - javascript
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    labels:
+      - dependencies
+      - github-actions
