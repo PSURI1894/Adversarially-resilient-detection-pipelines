@@ -8,9 +8,17 @@ Discriminator doubles as a secondary anomaly detector.
 """
 
 from __future__ import annotations
+
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras import layers, Model
+
+try:
+    import tensorflow as tf
+    from tensorflow.keras import layers, Model
+except ImportError:  # pragma: no cover
+    tf = None  # type: ignore[assignment]
+    layers = None  # type: ignore[assignment]
+    Model = object  # type: ignore[assignment,misc]
+
 from typing import Optional, List
 
 

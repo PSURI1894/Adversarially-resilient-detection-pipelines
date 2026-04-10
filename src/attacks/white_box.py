@@ -10,7 +10,12 @@ Implements PGD, Carlini & Wagner L2, and AutoAttack.
 from __future__ import annotations
 
 import numpy as np
-import tensorflow as tf
+
+try:
+    import tensorflow as tf
+except ImportError:  # pragma: no cover
+    tf = None  # type: ignore[assignment]
+
 from dataclasses import dataclass, field
 from typing import List, Protocol, runtime_checkable
 from abc import ABC, abstractmethod
