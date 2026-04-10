@@ -130,15 +130,26 @@ export default function AlertFeed({ alerts, stats, onSelectAlert }) {
                 onSelect={handleSelect}
               />
             ))}
-            {hasMore && (
-              <div style={{ padding: '8px 12px', textAlign: 'center' }}>
-                <button
-                  className="btn"
-                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                  style={{ fontSize: 10, padding: '4px 16px', color: 'var(--cyan)', borderColor: 'var(--cyan)' }}
-                >
-                  View More ({filtered.length - visibleCount} remaining)
-                </button>
+            {(hasMore || visibleCount > PAGE_SIZE) && (
+              <div style={{ padding: '8px 12px', textAlign: 'center', display: 'flex', gap: 8, justifyContent: 'center' }}>
+                {hasMore && (
+                  <button
+                    className="btn"
+                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    style={{ fontSize: 10, padding: '4px 16px', color: 'var(--cyan)', borderColor: 'var(--cyan)' }}
+                  >
+                    View More ({filtered.length - visibleCount} remaining)
+                  </button>
+                )}
+                {visibleCount > PAGE_SIZE && (
+                  <button
+                    className="btn"
+                    onClick={() => setVisibleCount(PAGE_SIZE)}
+                    style={{ fontSize: 10, padding: '4px 16px', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+                  >
+                    Collapse
+                  </button>
+                )}
               </div>
             )}
           </>
