@@ -33,10 +33,17 @@ jobs:
           chmod 400 ~/.ssh/ardp-key.pem
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
       - name: Build dashboard
         run: |
           cd dashboard
-          npm ci --silent
+          npm ci
           npm run build
 
       - name: Package and upload code
