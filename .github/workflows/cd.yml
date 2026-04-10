@@ -41,7 +41,7 @@ jobs:
       - name: Build dashboard
         run: |
           cd dashboard
-          npm ci
+          npm install --prefer-offline
           npm run build
 
       - name: Package and upload code
