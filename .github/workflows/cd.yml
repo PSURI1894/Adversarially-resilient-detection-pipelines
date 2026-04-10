@@ -33,6 +33,12 @@ jobs:
           chmod 400 ~/.ssh/ardp-key.pem
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
+      - name: Build dashboard
+        run: |
+          cd dashboard
+          npm ci --silent
+          npm run build
+
       - name: Package and upload code
         run: |
           tar --exclude='./.git' \
