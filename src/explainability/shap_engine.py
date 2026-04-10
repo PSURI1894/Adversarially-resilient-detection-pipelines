@@ -95,7 +95,7 @@ class SHAPExplainer:
             raw = self._compute_shap(x)
             # KernelExplainer with predict_proba returns list [class0(n,f), class1(n,f)]
             if isinstance(raw, list):
-                shap_vals = raw[1]        # class 1 (malicious)
+                shap_vals = raw[1]  # class 1 (malicious)
             else:
                 shap_vals = raw
             # Squeeze sample dim: (1, n_features) → (n_features,)
