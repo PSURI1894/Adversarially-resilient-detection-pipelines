@@ -14,7 +14,7 @@ export default function ThreatMap({ alerts, socState }) {
 
   // Update particles from alerts
   useEffect(() => {
-    const recent = alerts.slice(0, 80);
+    const recent = alerts.slice(0, 20);
     particlesRef.current = recent.map((a, i) => ({
       x: 30 + Math.random() * 240,
       y: 20 + Math.random() * 160,
@@ -90,7 +90,7 @@ export default function ThreatMap({ alerts, socState }) {
       <div className="glass-panel-header">
         <span>Threat Visualization</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
-          {alerts.length} flows
+          last {Math.min(20, alerts.length)} flows
         </span>
       </div>
       <div className="glass-panel-body" style={{ flex: 1, padding: 8 }}>

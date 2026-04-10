@@ -72,6 +72,12 @@ jobs:
             echo "Freeing disk space (old images/cache)..."
             docker system prune -af --volumes || true
 
+            echo "Stopping existing containers..."
+            docker compose \
+              --project-directory /home/ec2-user/ardp \
+              -f /home/ec2-user/ardp/infrastructure/aws/docker-compose.prod.yml \
+              down --remove-orphans 2>/dev/null || true
+
             echo "Rebuilding and restarting containers..."
             docker compose \
               --project-directory /home/ec2-user/ardp \
