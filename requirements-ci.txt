@@ -10,7 +10,7 @@ xgboost>=2.0,<2.1  # >=2.1 pulls nvidia-nccl-cu12 (293MB CUDA lib) on CPU hosts
 scipy>=1.11
 
 # Explainability
-shap>=0.43,<0.46   # >=0.46 pulls numba+llvmlite (56MB); stay on numpy-only backend
+shap==0.43.0        # 0.43.0 is the last version without numba as a hard dep; <0.46 for np.obj2sctype
 lime>=0.2
 
 # MLOps
