@@ -5,7 +5,12 @@
       "Bash(pip show:*)",
       "Bash(python -m ruff check src/ tests/)",
       "Bash(python3 -m ruff check src/ tests/)",
-      "Bash(find /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/src -name \"*.py\" -type f -exec grep -l \"  $\" {} \\\\;)"
+      "Bash(find /c/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/src -name \"*.py\" -type f -exec grep -l \"  $\" {} \\\\;)",
+      "Bash(curl -s -F \"reqtype=fileupload\" -F \"fileToUpload=@c:/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/demo_video.mp4\" https://catbox.moe/user/api.php)",
+      "Bash(curl -s --upload-file \"c:/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/demo_video.mp4\" https://transfer.sh/demo_video.mp4)",
+      "Bash(curl -s -X POST \"https://file.io\" -F \"file=@c:/Users/Hp/Downloads/Adversarially-resilient-detection-pipelines/demo_video.mp4\" -F \"expires=14d\")",
+      "Bash(python -c ' *)",
+      "Bash(gh --version)"
     ]
   }
 }
